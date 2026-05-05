@@ -1,0 +1,18 @@
+# Optional: PostgreSQL for local development
+# Use: docker-compose up -d
+# Then set DATABASE_URL=postgresql://pdv_user:pdv_pass@localhost:5432/pdv_db in backend/.env
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: pdv_user
+      POSTGRES_PASSWORD: pdv_pass
+      POSTGRES_DB: pdv_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata: {}

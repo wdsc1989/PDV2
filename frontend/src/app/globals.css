@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #2563eb;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #3b82f6;
+  --spacing-section: 1.5rem;
+  --spacing-card-gap: 1rem;
+  --radius-card: 0.5rem;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
