@@ -48,7 +48,7 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
       <button
         type="button"
         onClick={onMenuClick}
-        className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+        className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 rounded"
         aria-label="Abrir menu"
       >
         <IconMenu />
@@ -59,7 +59,7 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
           <button
             type="button"
             onClick={() => setNotifOpen((o) => !o)}
-            className="relative p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            className="relative p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600 rounded"
             aria-label="Notificações"
           >
             <IconBell />
@@ -125,7 +125,7 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 rounded"
         >
           <IconLogOut />
           <span>Sair</span>

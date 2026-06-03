@@ -13,7 +13,7 @@ export interface KpiCardProps {
 }
 
 const variantClasses = {
-  default: "border-gray-100",
+  default: "border-rose-100",
   alert: "border-amber-400 border-2",
   success: "border-green-200 border",
 };
@@ -35,7 +35,7 @@ export function KpiCard({
       <p className="text-xl font-bold text-gray-900">{value}</p>
       {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
       {href && (
-        <Link href={href} className="text-sm text-blue-600 hover:underline mt-2 inline-block">
+        <Link href={href} className="text-sm text-primary-700 hover:underline mt-2 inline-block">
           {linkLabel}
         </Link>
       )}

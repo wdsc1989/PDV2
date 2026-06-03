@@ -19,9 +19,9 @@ export interface CartPanelProps {
 
 export function CartPanel({ items, onQtyChange, onRemove, total }: CartPanelProps) {
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-3 border-b border-gray-200 bg-gray-50">
-        <h2 className="font-semibold text-gray-900">Carrinho</h2>
+    <div className="flex flex-col h-full bg-white rounded-lg border border-rose-100 shadow-sm overflow-hidden">
+      <div className="p-3 border-b border-rose-100 bg-rose-50">
+        <h2 className="font-heading font-semibold text-gray-900">Carrinho</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
         {items.length === 0 ? (
@@ -50,8 +50,9 @@ export function CartPanel({ items, onQtyChange, onRemove, total }: CartPanelProp
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="!px-2 !py-1 min-w-0"
+                    className="!px-3 min-h-[44px] min-w-[44px] touch-manipulation"
                     onClick={() => onQtyChange(item.product_id, Math.max(0, item.quantidade - 1))}
+                    aria-label="Diminuir quantidade"
                   >
                     -
                   </Button>
@@ -60,8 +61,9 @@ export function CartPanel({ items, onQtyChange, onRemove, total }: CartPanelProp
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="!px-2 !py-1 min-w-0"
+                    className="!px-3 min-h-[44px] min-w-[44px] touch-manipulation"
                     onClick={() => onQtyChange(item.product_id, item.quantidade + 1)}
+                    aria-label="Aumentar quantidade"
                   >
                     +
                   </Button>
@@ -73,8 +75,8 @@ export function CartPanel({ items, onQtyChange, onRemove, total }: CartPanelProp
           ))
         )}
       </div>
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <p className="text-right font-bold text-lg text-gray-900">Total: R$ {total.toFixed(2)}</p>
+      <div className="p-3 border-t border-rose-100 bg-rose-50">
+        <p className="text-right font-heading font-bold text-lg text-gray-900">Total: R$ {total.toFixed(2)}</p>
       </div>
     </div>
   );

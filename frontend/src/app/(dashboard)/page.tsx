@@ -104,16 +104,16 @@ export default function Home() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Visão geral</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-lg shadow border border-gray-100 bg-white p-4">
+          <div className="rounded-lg shadow border border-rose-100 bg-white p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Vendas (últimos 7 dias)</h3>
             <div className="h-48">
               <SalesLineChart data={salesByDay} className="h-48" />
             </div>
           </div>
-          <div className="rounded-lg shadow border border-gray-100 bg-white p-4">
+          <div className="rounded-lg shadow border border-rose-100 bg-white p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Top 5 produtos (7 dias)</h3>
             {topProducts.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4">Sem dados no período.</p>
+              <p className="text-sm text-gray-400 py-6 text-center">Sem vendas no período ainda.</p>
             ) : (
               <ul className="space-y-2">
                 {topProducts.map((p) => (

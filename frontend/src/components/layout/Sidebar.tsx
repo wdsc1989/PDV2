@@ -48,8 +48,8 @@ function SidebarNav({ onNavigate, mobileOnly }: { onNavigate?: () => void; mobil
 
   return (
     <>
-      <div className={`p-4 border-b border-slate-700 ${mobileOnly ? "lg:hidden" : ""}`}>
-        <Link href="/" className="font-bold text-lg flex items-center gap-2" onClick={onNavigate}>
+      <div className={`p-4 border-b border-rose-900 ${mobileOnly ? "lg:hidden" : ""}`}>
+        <Link href="/" className="font-heading font-bold text-lg flex items-center gap-2 text-white" onClick={onNavigate}>
           PDV2
         </Link>
       </div>
@@ -63,7 +63,7 @@ function SidebarNav({ onNavigate, mobileOnly }: { onNavigate?: () => void; mobil
               href={item.href}
               onClick={onNavigate}
               className={`flex items-center gap-3 px-3 py-2 rounded mb-1 ${
-                isActive ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                isActive ? "bg-primary-700 text-white" : "text-rose-200 hover:bg-rose-900 hover:text-white"
               }`}
             >
               <Icon />
@@ -72,18 +72,18 @@ function SidebarNav({ onNavigate, mobileOnly }: { onNavigate?: () => void; mobil
           );
         })}
       </nav>
-      <div className="p-3 border-t border-slate-700">
-        <p className="text-sm text-slate-400 truncate" title={auth.user?.name}>
+      <div className="mt-auto p-3 border-t border-rose-900 space-y-1">
+        <p className="text-sm text-rose-200 truncate" title={auth.user?.name}>
           {auth.user?.name}
         </p>
-        <p className="text-xs text-slate-500">{auth.user?.role}</p>
+        <p className="text-xs text-rose-400">{auth.user?.role}</p>
       </div>
     </>
   );
 }
 
 export function Sidebar({ onNavigate, isMobileOpen, mobileOnly }: SidebarProps) {
-  const baseClass = "min-h-screen bg-slate-800 text-white flex flex-col shrink-0";
+  const baseClass = "min-h-screen bg-rose-950 text-white flex flex-col shrink-0";
 
   if (mobileOnly) {
     return (
@@ -105,7 +105,7 @@ export function SidebarDrawer({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" aria-hidden onClick={onClose} />
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-slate-800 text-white flex flex-col lg:hidden">
+      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-rose-950 text-white flex flex-col lg:hidden">
         <SidebarNav onNavigate={onClose} mobileOnly />
       </aside>
     </>
