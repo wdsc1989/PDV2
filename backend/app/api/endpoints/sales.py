@@ -20,8 +20,10 @@ def _get_open_session(db: Session) -> CashSession | None:
 
 
 def _sale_for_role(sale: Sale, role: str) -> SaleResponse:
-    """Vendedor não enxerga lucro nem custo — campos saem como None."""
+    """Monta a resposta com nome do produto; vendedor não enxerga lucro nem custo."""
     resp = SaleResponse.model_validate(sale)
+    for item_resp, item_orm in zip(resp.itens, sale.itens):
+        item_resp.product_nome = item_orm.product.nome if item_orm.product else None
     if role == "vendedor":
         resp.total_lucro = None
         for item in resp.itens:

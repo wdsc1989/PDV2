@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Button, Card, Table, Input, Label, Badge, toast, KpiCard } from "@/components/ui";
+import { Button, Card, Table, Input, Label, Badge, toast, KpiCard, Segmented, PageHeader } from "@/components/ui";
 
 type Payable = { id: number; fornecedor: string; descricao: string | null; data_vencimento: string; data_pagamento: string | null; valor: number; status: string };
 type Receivable = { id: number; cliente: string; descricao: string | null; data_vencimento: string; data_recebimento: string | null; valor: number; status: string };
@@ -132,8 +132,15 @@ export default function ContasPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Contas a Pagar e a Receber</h1>
-      <p className="text-sm text-gray-500 mb-4">Controle de contas a pagar e a receber.</p>
+      <PageHeader
+        title="Contas"
+        subtitle="Controle de contas a pagar e a receber"
+        actions={
+          <Button variant="secondary" onClick={() => router.push("/agente-contas")}>
+            Usar Agente de Contas
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <KpiCard label="Total a pagar" value={`R$ ${totalAPagar.toFixed(2)}`} variant={totalAPagar > 0 ? "alert" : "default"} />
@@ -141,16 +148,16 @@ export default function ContasPage() {
         <KpiCard label="Contas vencidas" value={String(contasVencidas)} variant={contasVencidas > 0 ? "alert" : "default"} />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Button variant={tab === "pagar" ? "primary" : "secondary"} onClick={() => setTab("pagar")}>
-          A pagar
-        </Button>
-        <Button variant={tab === "receber" ? "primary" : "secondary"} onClick={() => setTab("receber")}>
-          A receber
-        </Button>
-        <Button variant="secondary" onClick={() => router.push("/agente-contas")}>
-          Usar Agente de Contas
-        </Button>
+      <div className="mb-6 max-w-md">
+        <Segmented
+          ariaLabel="Tipo de conta"
+          options={[
+            { value: "pagar", label: "A pagar" },
+            { value: "receber", label: "A receber" },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       </div>
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
@@ -177,7 +184,7 @@ export default function ContasPage() {
                   <Input id="pagar-desc" value={formPagar.descricao} onChange={(e) => setFormPagar((f) => ({ ...f, descricao: e.target.value }))} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+                  <Button type="submit" loading={saving}>Salvar</Button>
                 </div>
               </div>
             </form>
@@ -234,7 +241,7 @@ export default function ContasPage() {
                   <Input id="rec-desc" value={formReceber.descricao} onChange={(e) => setFormReceber((f) => ({ ...f, descricao: e.target.value }))} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+                  <Button type="submit" loading={saving}>Salvar</Button>
                 </div>
               </div>
             </form>

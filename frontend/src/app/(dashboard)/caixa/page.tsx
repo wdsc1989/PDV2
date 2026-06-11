@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Button, Card, Table, Input, Label, Badge, toast, KpiCard, ConfirmModal } from "@/components/ui";
+import { Button, Card, Table, Input, Label, Badge, toast, KpiCard, ConfirmModal, PageHeader } from "@/components/ui";
 
 type CashSession = {
   id: number;
@@ -25,6 +25,7 @@ export default function CaixaPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<"idle" | "opening" | "closing">("idle");
+  const [valorAbertura, setValorAbertura] = useState("");
   const [valorFechamento, setValorFechamento] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -61,10 +62,16 @@ export default function CaixaPage() {
   const showLongOpenAlert = !!session && sessionOpenHours >= SESSION_ALERT_HOURS;
 
   async function openCash() {
+    const v = valorAbertura.trim() ? parseFloat(valorAbertura.replace(",", ".")) : 0;
+    if (isNaN(v) || v < 0) {
+      toast.error("Valor inicial inválido.");
+      return;
+    }
     setAction("opening");
     try {
-      await apiFetch("/cash/open", { method: "POST", body: JSON.stringify({ valor_abertura: 0 }) });
+      await apiFetch("/cash/open", { method: "POST", body: JSON.stringify({ valor_abertura: v }) });
       toast.success("Caixa aberto.");
+      setValorAbertura("");
       const [current, salesList] = await Promise.all([
         apiFetch<CashSession | null>("/cash/current"),
         apiFetch<Sale[]>("/sales?limit=500"),
@@ -128,10 +135,11 @@ export default function CaixaPage() {
 
   if (!mounted || loading) return <div className="p-4">Carregando...</div>;
 
+  const esperadoDinheiro = session ? (session.valor_abertura || 0) + (byPayment["dinheiro"] || 0) : 0;
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Caixa</h1>
-      <p className="text-sm text-gray-500 mb-6">Abertura, fechamento e histórico de sessões.</p>
+      <PageHeader title="Caixa" subtitle="Abertura, fechamento e histórico de sessões" />
 
       {showLongOpenAlert && (
         <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
@@ -168,30 +176,50 @@ export default function CaixaPage() {
           <Card>
             <div className="flex flex-wrap gap-4 items-end">
               <div>
-                <Label htmlFor="valor-fech">Valor fechamento</Label>
+                <Label htmlFor="valor-fech">Valor contado em caixa (R$)</Label>
                 <Input
                   id="valor-fech"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
-                  placeholder="Valor"
+                  placeholder="0,00"
                   value={valorFechamento}
                   onChange={(e) => setValorFechamento(e.target.value)}
-                  className="w-40"
+                  className="w-40 tabular-nums"
                 />
+                <p className="mt-1 text-xs text-gray-500 tabular-nums">
+                  Esperado em dinheiro: R$ {esperadoDinheiro.toFixed(2)} (abertura + vendas em dinheiro)
+                </p>
               </div>
-              <Button variant="danger" onClick={requestClose} disabled={action === "closing"}>
+              <Button variant="danger" onClick={requestClose} loading={action === "closing"}>
                 Fechar caixa
               </Button>
             </div>
           </Card>
         </div>
       ) : (
-        <div className="mb-8">
-          <p className="mb-4 text-gray-600">Nenhuma sessão aberta.</p>
-          <Button onClick={openCash} disabled={action === "opening"}>
-            Abrir caixa
-          </Button>
-        </div>
+        <Card className="mb-8 max-w-md">
+          <p className="mb-3 text-gray-600">Nenhuma sessão aberta.</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <Label htmlFor="valor-abertura">Valor inicial (troco)</Label>
+              <Input
+                id="valor-abertura"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+                value={valorAbertura}
+                onChange={(e) => setValorAbertura(e.target.value)}
+                className="w-40 tabular-nums"
+              />
+            </div>
+            <Button onClick={openCash} loading={action === "opening"} className="min-h-[44px]">
+              Abrir caixa
+            </Button>
+          </div>
+        </Card>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-2">

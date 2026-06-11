@@ -23,3 +23,19 @@
 body {
   @apply bg-[#FDF2F8] text-gray-900;
 }
+
+/* Impressão (recibo, relatórios): só o conteúdo, sem navegação nem fundo rosa */
+@media print {
+  body {
+    background: #fff;
+  }
+  aside,
+  nav,
+  main > header,
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

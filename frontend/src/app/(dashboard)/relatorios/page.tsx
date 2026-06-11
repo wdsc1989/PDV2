@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Card, Table, Badge, Button } from "@/components/ui";
+import { Card, Table, Badge, Button, Skeleton } from "@/components/ui";
 import { ReportFilters } from "@/components/reports/ReportFilters";
 import type {
   ReportSummary,
@@ -141,7 +141,17 @@ export default function RelatoriosPage() {
       <ReportFilters filters={filters} onChange={setFilters} categoryOptions={categories} />
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
-      {loading && <p className="text-gray-500 mb-4">Carregando...</p>}
+      {loading && (
+        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4" role="status" aria-label="Carregando relatórios...">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-2 rounded-lg border border-rose-100 bg-white p-4">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-7 w-1/2" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {summary && (
         <>

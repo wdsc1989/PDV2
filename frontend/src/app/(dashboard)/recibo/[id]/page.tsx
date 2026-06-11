@@ -7,7 +7,7 @@ import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
 import { Button } from "@/components/ui";
 
-type SaleItem = { id: number; product_id: number; quantidade: number; preco_unitario: number; subtotal: number };
+type SaleItem = { id: number; product_id: number; product_nome: string | null; quantidade: number; preco_unitario: number; subtotal: number };
 type Sale = {
   id: number;
   data_venda: string;
@@ -69,7 +69,7 @@ export default function ReciboPage() {
           <tbody>
             {sale.itens?.map((item) => (
               <tr key={item.id} className="border-b border-gray-100">
-                <td className="py-1">Produto #{item.product_id}</td>
+                <td className="py-1">{item.product_nome ?? `Produto #${item.product_id}`}</td>
                 <td className="text-right py-1">{item.quantidade}</td>
                 <td className="text-right py-1">R$ {item.preco_unitario.toFixed(2)}</td>
                 <td className="text-right py-1">R$ {item.subtotal.toFixed(2)}</td>

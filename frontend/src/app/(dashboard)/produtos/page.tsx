@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useAuthStore } from "@/store/auth";
-import { apiFetch } from "@/api/client";
-import { Button, Card, Table, Input, Label, Select, toast, KpiCard, FilterBar, Badge, ConfirmModal } from "@/components/ui";
+import { apiFetch, assetUrl } from "@/api/client";
+import { Button, Card, Table, Input, Label, Select, toast, KpiCard, FilterBar, Badge, ConfirmModal, PageHeader } from "@/components/ui";
+
+function ProductPlaceholderIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={`${className} text-rose-300`} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="m3.3 7 8.7 5 8.7-5" />
+      <path d="M12 22V12" />
+    </svg>
+  );
+}
 
 type Product = {
   id: number;
@@ -43,8 +53,11 @@ export default function ProdutosPage() {
   const [showStockForm, setShowStockForm] = useState(false);
   const [stockProductId, setStockProductId] = useState("");
   const [stockQty, setStockQty] = useState("");
+  const [stockCusto, setStockCusto] = useState("");
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<{ id: number; nome: string }[]>([]);
   const [search, setSearch] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("");
@@ -125,14 +138,27 @@ export default function ProdutosPage() {
       imagem_path: form.imagem_path.trim() || null,
     };
     try {
+      let productId = editingId;
       if (editingId != null) {
         await apiFetch(`/products/${editingId}`, { method: "PATCH", body: JSON.stringify(payload) });
         toast.success("Produto atualizado.");
         setEditingId(null);
       } else {
-        await apiFetch("/products", { method: "POST", body: JSON.stringify(payload) });
+        const created = await apiFetch<Product>("/products", { method: "POST", body: JSON.stringify(payload) });
+        productId = created.id;
         toast.success("Produto cadastrado.");
       }
+      if (imageFile && productId != null) {
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        try {
+          await apiFetch(`/products/${productId}/image`, { method: "POST", body: fd });
+        } catch (imgErr) {
+          toast.error(imgErr instanceof Error ? imgErr.message : "Produto salvo, mas a foto falhou.");
+        }
+      }
+      setImageFile(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
       setForm({ codigo: "", nome: "", categoria: "", marca: "", preco_custo: "0", preco_venda: "0", estoque_minimo: "", ativo: true, categoria_id: "", imagem_path: "" });
       setShowForm(false);
       loadProducts();
@@ -164,13 +190,15 @@ export default function ProdutosPage() {
     setStockSaving(true);
     try {
       const hoje = new Date().toISOString().slice(0, 10);
+      const custo = stockCusto.trim() ? parseFloat(stockCusto.replace(",", ".")) : null;
       await apiFetch("/stock/entries", {
         method: "POST",
-        body: JSON.stringify({ product_id: pid, quantity: qty, data_entrada: hoje, observacao: "Entrada pelo frontend" }),
+        body: JSON.stringify({ product_id: pid, quantity: qty, preco_custo_unitario: custo, data_entrada: hoje, observacao: "Entrada pelo frontend" }),
       });
-      toast.success("Entrada de estoque registrada.");
+      toast.success(custo != null ? "Entrada registrada. Custo médio atualizado." : "Entrada de estoque registrada.");
       setStockProductId("");
       setStockQty("");
+      setStockCusto("");
       setShowStockForm(false);
       loadProducts();
     } catch (err) {
@@ -194,22 +222,28 @@ export default function ProdutosPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Produtos</h1>
-      <p className="text-sm text-gray-500 mb-6">Cadastro e gestão de produtos.</p>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          onClick={() => {
-            setEditingId(null);
-            setForm({ codigo: "", nome: "", categoria: "", marca: "", preco_custo: "0", preco_venda: "0", estoque_minimo: "", ativo: true, categoria_id: "", imagem_path: "" });
-            setShowForm((v) => !v);
-          }}
-        >
-          {showForm ? "Cancelar" : "+ Novo produto"}
-        </Button>
-        <Button variant="secondary" onClick={() => setShowStockForm((v) => !v)}>{showStockForm ? "Cancelar" : "Entrada de estoque"}</Button>
-      </div>
+      <PageHeader
+        title="Produtos"
+        subtitle="Cadastro e gestão de produtos"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setShowStockForm((v) => !v)}>
+              {showStockForm ? "Cancelar" : "Entrada de estoque"}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setEditingId(null);
+                setImageFile(null);
+                setForm({ codigo: "", nome: "", categoria: "", marca: "", preco_custo: "0", preco_venda: "0", estoque_minimo: "", ativo: true, categoria_id: "", imagem_path: "" });
+                setShowForm((v) => !v);
+              }}
+            >
+              {showForm ? "Cancelar" : "+ Novo produto"}
+            </Button>
+          </>
+        }
+      />
 
       <FilterBar
         searchValue={search}
@@ -259,8 +293,12 @@ export default function ProdutosPage() {
                 <Label htmlFor="stock-qty">Quantidade</Label>
                 <Input id="stock-qty" type="number" step="0.01" min="0.01" value={stockQty} onChange={(e) => setStockQty(e.target.value)} required />
               </div>
+              <div>
+                <Label htmlFor="stock-custo">Custo unitário (R$)</Label>
+                <Input id="stock-custo" type="number" step="0.01" min="0" placeholder="opcional — atualiza o custo médio" value={stockCusto} onChange={(e) => setStockCusto(e.target.value)} />
+              </div>
               <div className="flex gap-2">
-                <Button type="submit" disabled={stockSaving}>{stockSaving ? "Salvando..." : "Registrar entrada"}</Button>
+                <Button type="submit" loading={stockSaving}>Registrar entrada</Button>
                 <Button type="button" variant="secondary" onClick={() => setShowStockForm(false)}>Cancelar</Button>
               </div>
             </div>
@@ -310,8 +348,27 @@ export default function ProdutosPage() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="imagem">URL da imagem</Label>
-                <Input id="imagem" type="url" placeholder="https://..." value={form.imagem_path} onChange={(e) => setForm((f) => ({ ...f, imagem_path: e.target.value }))} />
+                <Label htmlFor="imagem-file">Foto do produto</Label>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-rose-50">
+                    {imageFile ? (
+                      <img src={URL.createObjectURL(imageFile)} alt="Pré-visualização" className="h-full w-full object-cover" />
+                    ) : form.imagem_path ? (
+                      <img src={assetUrl(form.imagem_path) ?? undefined} alt="Foto atual" className="h-full w-full object-cover" />
+                    ) : (
+                      <ProductPlaceholderIcon className="w-7 h-7" />
+                    )}
+                  </div>
+                  <input
+                    id="imagem-file"
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                    className="text-sm text-gray-600 file:mr-3 file:min-h-[40px] file:cursor-pointer file:rounded-lg file:border-0 file:bg-rose-50 file:px-3 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-rose-100"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">JPG, PNG ou WebP até 5 MB — aparece na grade da tela de venda.</p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="ativo" checked={form.ativo} onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))} className="rounded" />
@@ -333,11 +390,11 @@ export default function ProdutosPage() {
               key: "imagem_path",
               label: "Imagem",
               render: (r) => (
-                <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-10 h-10 rounded bg-rose-50 flex items-center justify-center overflow-hidden shrink-0">
                   {r.imagem_path ? (
-                    <img src={r.imagem_path} alt="" className="w-full h-full object-cover" />
+                    <img src={assetUrl(r.imagem_path) ?? undefined} alt="" loading="lazy" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-gray-400 text-lg">📦</span>
+                    <ProductPlaceholderIcon />
                   )}
                 </div>
               ),
@@ -368,11 +425,11 @@ export default function ProdutosPage() {
           return (
             <Card key={p.id} className={`p-4 ${lowStock ? "border-amber-400 border-2" : ""}`}>
               <div className="flex gap-3">
-                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-14 h-14 rounded-lg bg-rose-50 flex items-center justify-center overflow-hidden shrink-0">
                   {p.imagem_path ? (
-                    <img src={p.imagem_path} alt="" className="w-full h-full object-cover" />
+                    <img src={assetUrl(p.imagem_path) ?? undefined} alt="" loading="lazy" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-gray-400 text-2xl">📦</span>
+                    <ProductPlaceholderIcon className="w-7 h-7" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

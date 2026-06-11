@@ -36,3 +36,4 @@ class SaleItem(Base):
     lucro_item = Column(Float, nullable=False, default=0.0)
 
     sale = relationship("Sale", back_populates="itens")
+    product = relationship("Product")

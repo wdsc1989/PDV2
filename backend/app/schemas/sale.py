@@ -18,6 +18,7 @@ class SaleCreate(BaseModel):
 class SaleItemResponse(BaseModel):
     id: int
     product_id: int
+    product_nome: str | None = None
     quantidade: float
     preco_unitario: float
     # None quando o usuário não pode ver custo/lucro (vendedor).
