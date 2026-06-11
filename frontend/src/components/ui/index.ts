@@ -25,3 +25,4 @@ export { Spinner } from "./Spinner";
 export { PageHeader } from "./PageHeader";
 export { IconButton } from "./IconButton";
 export { InfoHint } from "./InfoHint";
+export { ErrorState } from "./ErrorState";

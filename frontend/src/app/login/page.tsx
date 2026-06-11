@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
-import { loginJson } from "@/api/client";
-import { apiFetch } from "@/api/client";
+import { loginJson, apiFetch } from "@/api/client";
+import { Button, Input, Label } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,7 +12,10 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function LoginPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-dvh flex items-center justify-center bg-rose-50">
         <p>Carregando...</p>
       </div>
     );
@@ -35,7 +38,7 @@ export default function LoginPage() {
 
   if (auth.isAuthenticated()) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-dvh flex items-center justify-center bg-rose-50">
         <p>Redirecionando...</p>
       </div>
     );
@@ -43,6 +46,11 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const userErr = username.trim() ? "" : "Informe o usuário.";
+    const passErr = password ? "" : "Informe a senha.";
+    setUsernameError(userErr);
+    setPasswordError(passErr);
+    if (userErr || passErr) return;
     setError("");
     setLoading(true);
     try {
@@ -60,20 +68,69 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow">
-        <h1 className="text-xl font-bold text-center mb-4">PDV2 - Login</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-b from-rose-50 to-white p-4">
+      <div className="w-full max-w-sm rounded-xl border border-rose-100 bg-white p-6 shadow-sm">
+        <h1 className="font-heading mb-1 text-center text-2xl font-bold text-primary-700">PDV2</h1>
+        <p className="mb-6 text-center text-sm text-gray-500">Entre para começar a vender</p>
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Usuario</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full border rounded px-3 py-2" required />
+            <Label htmlFor="login-user">Usuário</Label>
+            <Input
+              id="login-user"
+              type="text"
+              autoComplete="username"
+              autoFocus
+              value={username}
+              aria-invalid={usernameError ? true : undefined}
+              className={`min-h-[48px] ${usernameError ? "border-red-500" : ""}`}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (usernameError && e.target.value.trim()) setUsernameError("");
+              }}
+              onBlur={() => setUsernameError(username.trim() ? "" : "Informe o usuário.")}
+            />
+            {usernameError && <p role="alert" className="mt-1 text-xs text-red-600">{usernameError}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Senha</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border rounded px-3 py-2" required />
+            <Label htmlFor="login-pass">Senha</Label>
+            <div className="relative">
+              <Input
+                id="login-pass"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                aria-invalid={passwordError ? true : undefined}
+                className={`min-h-[48px] pr-12 ${passwordError ? "border-red-500" : ""}`}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (passwordError && e.target.value) setPasswordError("");
+                }}
+                onBlur={() => setPasswordError(password ? "" : "Informe a senha.")}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-r-lg"
+              >
+                {showPassword ? (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            {passwordError && <p role="alert" className="mt-1 text-xs text-red-600">{passwordError}</p>}
           </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button type="submit" disabled={loading} className="w-full py-2 bg-blue-600 text-white rounded">Entrar</button>
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" loading={loading} className="min-h-[48px] w-full">
+            Entrar
+          </Button>
         </form>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Button, Modal, Table, Input, Label, Select, Badge, toast, Card, EmptyState } from "@/components/ui";
+import { Button, Modal, Table, Input, Label, Select, Badge, toast, Card, EmptyState, ConfirmModal } from "@/components/ui";
 
 type User = { id: number; username: string; name: string; role: string; active: boolean; signo: string | null };
 
@@ -50,6 +50,10 @@ export default function AdminPage() {
   const [resetPasswordNew, setResetPasswordNew] = useState("");
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
   const [resetSaving, setResetSaving] = useState(false);
+  const [deactivateUserId, setDeactivateUserId] = useState<number | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deleteAiProvider, setDeleteAiProvider] = useState<string | null>(null);
+  const [deletingAi, setDeletingAi] = useState(false);
   const [config, setConfig] = useState({
     reciboLogo: "",
     reciboMensagem: "",
@@ -132,14 +136,18 @@ export default function AdminPage() {
     }
   }
 
-  async function deleteAiConfig(provider: string) {
-    if (!confirm(`Remover configuração de IA para ${provider}?`)) return;
+  async function deleteAiConfig() {
+    if (deleteAiProvider == null) return;
+    setDeletingAi(true);
     try {
-      await apiFetch(`/ai/config/${provider}`, { method: "DELETE" });
+      await apiFetch(`/ai/config/${deleteAiProvider}`, { method: "DELETE" });
       toast.success("Configuração removida.");
       loadAiConfigs();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao remover configuração");
+    } finally {
+      setDeletingAi(false);
+      setDeleteAiProvider(null);
     }
   }
 
@@ -254,15 +262,19 @@ export default function AdminPage() {
     }
   }
 
-  async function handleDeactivate(id: number) {
-    if (!confirm("Desativar este usuário? Ele não poderá mais fazer login.")) return;
+  async function handleDeactivate() {
+    if (deactivateUserId == null) return;
+    setDeactivating(true);
     try {
-      await apiFetch(`/users/${id}`, { method: "PATCH", body: JSON.stringify({ active: false }) });
+      await apiFetch(`/users/${deactivateUserId}`, { method: "PATCH", body: JSON.stringify({ active: false }) });
       toast.success("Usuário desativado.");
       loadUsers();
-      if (editingId === id) setShowModal(false);
+      if (editingId === deactivateUserId) setShowModal(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao desativar");
+    } finally {
+      setDeactivating(false);
+      setDeactivateUserId(null);
     }
   }
 
@@ -346,7 +358,7 @@ export default function AdminPage() {
               <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(u)}>Editar</Button>
               <Button type="button" variant="secondary" size="sm" onClick={() => { setResetPasswordUserId(u.id); setResetPasswordNew(""); setResetPasswordConfirm(""); }}>Redefinir senha</Button>
               {u.active && u.id !== user?.id && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => handleDeactivate(u.id)} className="text-red-600">Desativar</Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setDeactivateUserId(u.id)} className="text-red-600">Desativar</Button>
               )}
             </div>
           )}
@@ -480,7 +492,7 @@ export default function AdminPage() {
                     variant="ghost"
                     size="sm"
                     className="text-red-600"
-                    onClick={() => deleteAiConfig(cfg.provider)}
+                    onClick={() => setDeleteAiProvider(cfg.provider)}
                   >
                     Remover
                   </Button>
@@ -521,6 +533,28 @@ export default function AdminPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={deactivateUserId != null}
+        onClose={() => setDeactivateUserId(null)}
+        onConfirm={handleDeactivate}
+        title="Desativar usuário"
+        message="Desativar este usuário? Ele não poderá mais fazer login (pode ser reativado depois pela edição)."
+        confirmLabel="Desativar"
+        variant="danger"
+        loading={deactivating}
+      />
+
+      <ConfirmModal
+        open={deleteAiProvider != null}
+        onClose={() => setDeleteAiProvider(null)}
+        onConfirm={deleteAiConfig}
+        title="Remover configuração de IA"
+        message={`Remover a configuração de IA do provedor ${deleteAiProvider ?? ""}? A chave salva será apagada.`}
+        confirmLabel="Remover"
+        variant="danger"
+        loading={deletingAi}
+      />
     </div>
   );
 }

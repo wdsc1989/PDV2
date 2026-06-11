@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Button, Modal, Table, Input, Label, Badge, toast } from "@/components/ui";
+import { Button, Modal, Table, Input, Label, Badge, toast, ConfirmModal, PageHeader, SkeletonRows, EmptyState, ErrorState } from "@/components/ui";
 
 type Category = { id: number; nome: string; descricao: string | null; ativo: boolean };
 
@@ -11,13 +11,25 @@ export default function CategoriasPage() {
   const { isAuthenticated } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [nomeError, setNomeError] = useState("");
   const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
 
-  const loadCategories = () => apiFetch<Category[]>("/categories/all").then(setCategories).catch(() => setCategories([]));
+  const loadCategories = () => {
+    setLoading(true);
+    setLoadError(false);
+    apiFetch<Category[]>("/categories/all")
+      .then(setCategories)
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -44,6 +56,10 @@ export default function CategoriasPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.nome.trim()) {
+      setNomeError("Informe o nome da categoria.");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
@@ -69,15 +85,19 @@ export default function CategoriasPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Excluir esta categoria?")) return;
+  async function handleDelete() {
+    if (deleteId == null) return;
+    setDeleting(true);
     try {
-      await apiFetch(`/categories/${id}`, { method: "DELETE" });
+      await apiFetch(`/categories/${deleteId}`, { method: "DELETE" });
       toast.success("Categoria excluída.");
       loadCategories();
-      if (editingId === id) setShowModal(false);
+      if (editingId === deleteId) setShowModal(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao excluir");
+    } finally {
+      setDeleting(false);
+      setDeleteId(null);
     }
   }
 
@@ -85,13 +105,15 @@ export default function CategoriasPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Categorias</h1>
-
-      <div className="mb-6">
-        <Button variant="primary" onClick={openCreate}>
-          + Nova categoria
-        </Button>
-      </div>
+      <PageHeader
+        title="Categorias"
+        subtitle="Organize os produtos para filtrar mais rápido na venda"
+        actions={
+          <Button variant="primary" onClick={openCreate}>
+            + Nova categoria
+          </Button>
+        }
+      />
 
       <Modal
         open={showModal}
@@ -106,9 +128,16 @@ export default function CategoriasPage() {
               <Input
                 id="cat-nome"
                 value={form.nome}
-                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                aria-invalid={nomeError ? true : undefined}
+                className={nomeError ? "border-red-500" : ""}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, nome: e.target.value }));
+                  if (nomeError && e.target.value.trim()) setNomeError("");
+                }}
+                onBlur={() => setNomeError(form.nome.trim() ? "" : "Informe o nome da categoria.")}
                 required
               />
+              {nomeError && <p role="alert" className="mt-1 text-xs text-red-600">{nomeError}</p>}
             </div>
             <div>
               <Label htmlFor="cat-desc">Descrição</Label>
@@ -129,8 +158,8 @@ export default function CategoriasPage() {
               <Label htmlFor="cat-ativo">Ativo</Label>
             </div>
             <div className="flex gap-2 mt-2">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Salvando..." : "Salvar"}
+              <Button type="submit" loading={saving}>
+                Salvar
               </Button>
               <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
                 Cancelar
@@ -140,20 +169,44 @@ export default function CategoriasPage() {
         </form>
       </Modal>
 
-      <Table<Category>
-        columns={[
-          { key: "nome", label: "Nome" },
-          { key: "descricao", label: "Descrição", render: (r) => r.descricao ?? "—" },
-          { key: "ativo", label: "Ativo", render: (r) => (r.ativo ? <Badge variant="success">Sim</Badge> : <Badge variant="default">Não</Badge>) },
-        ]}
-        data={categories}
-        keyExtractor={(r) => r.id}
-        actions={(c) => (
-          <>
-            <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(c)}>Editar</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(c.id)} className="text-red-600">Excluir</Button>
-          </>
-        )}
+      {loading ? (
+        <SkeletonRows rows={6} cols={3} />
+      ) : loadError ? (
+        <ErrorState onRetry={loadCategories} />
+      ) : categories.length === 0 ? (
+        <EmptyState
+          title="Nenhuma categoria ainda"
+          message="Crie a primeira categoria para organizar os produtos na tela de venda."
+          actionLabel="+ Nova categoria"
+          onAction={openCreate}
+        />
+      ) : (
+        <Table<Category>
+          columns={[
+            { key: "nome", label: "Nome" },
+            { key: "descricao", label: "Descrição", render: (r) => r.descricao ?? "—" },
+            { key: "ativo", label: "Ativo", render: (r) => (r.ativo ? <Badge variant="success">Sim</Badge> : <Badge variant="default">Não</Badge>) },
+          ]}
+          data={categories}
+          keyExtractor={(r) => r.id}
+          actions={(c) => (
+            <>
+              <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(c)}>Editar</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteId(c.id)} className="text-red-600">Excluir</Button>
+            </>
+          )}
+        />
+      )}
+
+      <ConfirmModal
+        open={deleteId != null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Excluir categoria"
+        message="Excluir esta categoria? Os produtos dela não são apagados, mas ficam sem categoria."
+        confirmLabel="Excluir"
+        variant="danger"
+        loading={deleting}
       />
     </div>
   );
