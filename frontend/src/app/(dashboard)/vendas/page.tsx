@@ -3,18 +3,21 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Input, Label, Select, toast, Button } from "@/components/ui";
+import { Input, Label, toast, ConfirmModal } from "@/components/ui";
 import {
   ProductGrid,
   CartPanel,
   PaymentPanel,
   DailySalesList,
   DailySummaryFooter,
+  CashStatusBanner,
+  SaleSuccessModal,
   type ProductForGrid,
   type CartItemForPanel,
   type PaymentType,
   type SaleForList,
   type SummaryData,
+  type CashSession,
 } from "@/components/vendas";
 
 type Product = ProductForGrid & { preco_custo: number };
@@ -34,13 +37,14 @@ export default function VendasPage() {
   const [categories, setCategories] = useState<{ id: number; nome: string }[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [cashSession, setCashSession] = useState<CashSession | null>(null);
+  const [cashLoading, setCashLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentType, setPaymentType] = useState<PaymentType>("dinheiro");
   const [valueReceived, setValueReceived] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
   const [productsLoading, setProductsLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [filterMin, setFilterMin] = useState("");
@@ -49,6 +53,10 @@ export default function VendasPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [lastAddedProductId, setLastAddedProductId] = useState<number | null>(null);
+  const [successSale, setSuccessSale] = useState<{ id: number; troco: number } | null>(null);
+  const [cancelSaleId, setCancelSaleId] = useState<number | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   const loadProducts = () => {
     setProductsLoading(true);
@@ -68,6 +76,13 @@ export default function VendasPage() {
     setSummaryLoading(true);
     apiFetch<SummaryData>("/reports/summary?days=1").then(setSummary).catch(() => setSummary(null)).finally(() => setSummaryLoading(false));
   };
+  const loadCash = () => {
+    setCashLoading(true);
+    apiFetch<CashSession | null>("/cash/current")
+      .then(setCashSession)
+      .catch(() => setCashSession(null))
+      .finally(() => setCashLoading(false));
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -78,6 +93,7 @@ export default function VendasPage() {
     loadSales();
     loadCategories();
     loadSummary();
+    loadCash();
   }, [mounted, isAuthenticated]);
 
   useEffect(() => {
@@ -122,7 +138,6 @@ export default function VendasPage() {
       toast.error(`Estoque insuficiente. Disponível: ${p.estoque_atual}`);
       return;
     }
-    setError("");
     setLastAddedProductId(p.id);
     const existing = cart.find((c) => c.product_id === p.id);
     const newQty = existing ? existing.quantidade + qty : qty;
@@ -158,6 +173,35 @@ export default function VendasPage() {
     setSearchQuery("");
     setShowSuggestions(false);
     setSuggestions([]);
+    // leitor de código de barras / operador: pronto para a próxima bipada
+    searchRef.current?.focus();
+  }
+
+  /** Enter na busca: prioriza código exato (leitor de código de barras), senão 1ª sugestão. */
+  async function handleSearchEnter() {
+    const term = searchQuery.trim();
+    if (!term) return;
+    const exactLocal = suggestions.find((s) => s.codigo.toLowerCase() === term.toLowerCase());
+    if (exactLocal) {
+      selectSuggestion(exactLocal);
+      return;
+    }
+    // scanner digita + Enter mais rápido que o debounce de 200ms — busca direta
+    try {
+      const params = new URLSearchParams();
+      params.set("active_only", "true");
+      params.set("q", term);
+      const list = await apiFetch<Product[]>(`/products?${params}`);
+      const exact = list.find((s) => s.codigo.toLowerCase() === term.toLowerCase());
+      const pick = exact ?? list[0];
+      if (pick) {
+        selectSuggestion(pick);
+      } else {
+        toast.error(`Nenhum produto encontrado para "${term}".`);
+      }
+    } catch {
+      toast.error("Erro ao buscar produto.");
+    }
   }
 
   function setCartQty(productId: number, newQty: number) {
@@ -182,17 +226,23 @@ export default function VendasPage() {
   }
 
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
+  const cartCount = cart.reduce((s, c) => s + c.quantidade, 0);
+  const cashClosed = !cashLoading && !cashSession;
 
   const handleFinish = useCallback(async () => {
     if (cart.length === 0) {
       toast.error("Adicione pelo menos um item ao carrinho.");
       return;
     }
-    if (paymentType === "dinheiro" && (parseFloat(valueReceived) || 0) < cartTotal) {
+    if (cashClosed) {
+      toast.error("Abra o caixa antes de registrar vendas.");
+      return;
+    }
+    const received = parseFloat(valueReceived) || 0;
+    if (paymentType === "dinheiro" && received < cartTotal) {
       toast.error("Valor recebido insuficiente.");
       return;
     }
-    setError("");
     setSubmitting(true);
     try {
       const res = await apiFetch<{ id: number }>("/sales", {
@@ -207,19 +257,20 @@ export default function VendasPage() {
           })),
         }),
       });
-      toast.success("Venda registrada.");
+      const troco = paymentType === "dinheiro" ? Math.max(0, received - cartTotal) : 0;
       setCart([]);
       setValueReceived("");
+      setMobileCartOpen(false);
+      setSuccessSale({ id: res.id, troco });
       loadSales();
       loadSummary();
-      window.open(`/recibo/${res.id}`, "_blank");
+      loadProducts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao finalizar. Verifique se o caixa está aberto.");
       toast.error(err instanceof Error ? err.message : "Erro ao finalizar venda.");
     } finally {
       setSubmitting(false);
     }
-  }, [cart, paymentType, valueReceived]);
+  }, [cart, paymentType, valueReceived, cartTotal, cashClosed]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -231,7 +282,7 @@ export default function VendasPage() {
       }
       if (e.key === "F5") {
         e.preventDefault();
-        if (!inInput && cart.length > 0) {
+        if (!inInput && cart.length > 0 && !cashClosed) {
           const total = cart.reduce((s, c) => s + c.subtotal, 0);
           const canFinish = paymentType !== "dinheiro" || (parseFloat(valueReceived) || 0) >= total;
           if (canFinish) handleFinish();
@@ -240,6 +291,9 @@ export default function VendasPage() {
       if (e.key === "Escape") {
         if (showSuggestions) {
           setShowSuggestions(false);
+          e.preventDefault();
+        } else if (mobileCartOpen) {
+          setMobileCartOpen(false);
           e.preventDefault();
         } else if (cart.length > 0 && !inInput) {
           setCart([]);
@@ -250,24 +304,26 @@ export default function VendasPage() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cart, paymentType, valueReceived, handleFinish, showSuggestions]);
+  }, [cart, paymentType, valueReceived, handleFinish, showSuggestions, cashClosed, mobileCartOpen]);
 
-  function handleCancelSale(saleId: number) {
-    if (!confirm("Estornar esta venda? O estoque será devolvido.")) return;
-    apiFetch(`/sales/${saleId}`, { method: "PATCH", body: JSON.stringify({ status: "cancelada" }) })
+  function confirmCancelSale() {
+    if (cancelSaleId == null) return;
+    setCancelLoading(true);
+    apiFetch(`/sales/${cancelSaleId}`, { method: "PATCH", body: JSON.stringify({ status: "cancelada" }) })
       .then(() => {
-        toast.success("Venda estornada.");
+        toast.success("Venda estornada. O estoque foi devolvido.");
         loadSales();
         loadSummary();
+        loadProducts();
       })
-      .catch((e) => toast.error(e.message || "Erro ao estornar"));
+      .catch((e) => toast.error(e.message || "Erro ao estornar"))
+      .finally(() => {
+        setCancelLoading(false);
+        setCancelSaleId(null);
+      });
   }
 
   const salesToday = useMemo(() => sales.filter((s) => s.data_venda === today()), [sales]);
-  const categoryOptions = useMemo(
-    () => [{ value: "", label: "Todas categorias" }, ...categories.map((c) => ({ value: String(c.id), label: c.nome }))],
-    [categories]
-  );
 
   const lastAdded = lastAddedProductId != null ? products.find((p) => p.id === lastAddedProductId) : null;
   const relatedProducts = useMemo(() => {
@@ -279,58 +335,122 @@ export default function VendasPage() {
 
   if (!mounted) return <div className="p-4">Carregando...</div>;
 
+  const paymentDisabledReason = cashClosed ? "Caixa fechado — abra o caixa para finalizar." : null;
+
+  const checkout = (
+    <>
+      <div className="flex-1 min-h-[280px] lg:min-h-0">
+        <CartPanel items={cart} onQtyChange={setCartQty} onRemove={removeFromCart} total={cartTotal} />
+      </div>
+      <PaymentPanel
+        total={cartTotal}
+        paymentType={paymentType}
+        onPaymentTypeChange={setPaymentType}
+        valueReceived={valueReceived}
+        onValueReceivedChange={setValueReceived}
+        onFinish={handleFinish}
+        submitting={submitting}
+        disabledReason={paymentDisabledReason}
+      />
+    </>
+  );
+
   return (
-    <div className="flex flex-col h-full">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Vendas</h1>
-      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+    <div className="flex flex-col h-full pb-20 lg:pb-0">
+      <h1 className="font-heading text-2xl font-bold text-gray-900 mb-4">Vendas</h1>
+
+      <CashStatusBanner
+        session={cashSession}
+        loading={cashLoading}
+        onOpened={(s) => {
+          setCashSession(s);
+          loadSummary();
+        }}
+      />
 
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex flex-wrap gap-3 mb-3">
-            <div ref={searchWrapRef} className="flex-1 min-w-[200px] relative">
-              <Label htmlFor="search">Buscar produto (F2, Enter adiciona 1º)</Label>
-              <Input
-                id="search"
-                ref={searchRef}
-                type="text"
-                placeholder="Nome, código ou categoria..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && suggestions.length > 0) {
-                    e.preventDefault();
-                    selectSuggestion(suggestions[0]);
-                  }
-                }}
-              />
-              {showSuggestions && (
-                <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-                  {suggestionsLoading ? (
-                    <li className="px-3 py-2 text-sm text-gray-500">Buscando...</li>
-                  ) : suggestions.length === 0 ? (
-                    <li className="px-3 py-2 text-sm text-gray-500">Nenhum resultado</li>
-                  ) : (
-                    suggestions.map((p) => (
-                      <li key={p.id}>
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex justify-between items-center"
-                          onClick={() => selectSuggestion(p)}
-                        >
-                          <span className="truncate">{p.nome}</span>
-                          <span className="text-blue-600 font-medium shrink-0 ml-2">R$ {p.preco_venda.toFixed(2)}</span>
-                        </button>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              )}
-            </div>
-            <div className="w-40">
-              <Label htmlFor="cat">Categoria</Label>
-              <Select id="cat" options={categoryOptions} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} />
-            </div>
+          <div ref={searchWrapRef} className="relative mb-3">
+            <Label htmlFor="search">Buscar produto (F2) — código de barras adiciona direto</Label>
+            <Input
+              id="search"
+              ref={searchRef}
+              type="text"
+              autoComplete="off"
+              placeholder="Nome, código ou categoria..."
+              className="min-h-[48px] text-base"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSearchEnter();
+                }
+              }}
+            />
+            {showSuggestions && (
+              <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                {suggestionsLoading ? (
+                  <li className="px-3 py-2 text-sm text-gray-500">Buscando...</li>
+                ) : suggestions.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-gray-500">Nenhum resultado</li>
+                ) : (
+                  suggestions.map((p) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className="w-full min-h-[44px] cursor-pointer text-left px-3 py-2 text-sm hover:bg-rose-50 flex justify-between items-center"
+                        onClick={() => selectSuggestion(p)}
+                      >
+                        <span className="truncate">{p.nome}</span>
+                        <span className="text-primary-700 font-semibold tabular-nums shrink-0 ml-2">
+                          R$ {p.preco_venda.toFixed(2)}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
           </div>
+
+          <div
+            className="mb-3 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
+            role="group"
+            aria-label="Filtrar por categoria"
+          >
+            <button
+              type="button"
+              onClick={() => setCategoryId("")}
+              aria-pressed={categoryId === ""}
+              className={`min-h-[44px] shrink-0 cursor-pointer rounded-full border px-4 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-400 ${
+                categoryId === ""
+                  ? "border-primary-700 bg-primary-700 text-white"
+                  : "border-rose-200 bg-white text-gray-700 hover:bg-rose-50"
+              }`}
+            >
+              Todas
+            </button>
+            {categories.map((c) => {
+              const active = categoryId === String(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoryId(active ? "" : String(c.id))}
+                  aria-pressed={active}
+                  className={`min-h-[44px] shrink-0 cursor-pointer rounded-full border px-4 text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-400 ${
+                    active
+                      ? "border-primary-700 bg-primary-700 text-white"
+                      : "border-rose-200 bg-white text-gray-700 hover:bg-rose-50"
+                  }`}
+                >
+                  {c.nome}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex-1 min-h-[300px] overflow-auto">
             <ProductGrid
               products={products.filter((p) => p.estoque_atual > 0)}
@@ -338,53 +458,74 @@ export default function VendasPage() {
               loading={productsLoading}
             />
           </div>
+
           {relatedProducts.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Você também pode gostar</h3>
               <div className="flex flex-wrap gap-2">
                 {relatedProducts.map((p) => (
-                  <div
+                  <button
                     key={p.id}
-                    className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm"
+                    type="button"
+                    onClick={() => addToCart(p, 1)}
+                    disabled={p.estoque_atual < 1}
+                    className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 shadow-sm transition-colors duration-150 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-primary-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <span className="text-sm font-medium text-gray-900 truncate max-w-[120px]">{p.nome}</span>
-                    <span className="text-sm text-blue-600 font-semibold">R$ {p.preco_venda.toFixed(2)}</span>
-                    <Button type="button" size="sm" onClick={() => addToCart(p, 1)} disabled={p.estoque_atual < 1}>
-                      +
-                    </Button>
-                  </div>
+                    <span className="text-sm font-medium text-gray-900 truncate max-w-[140px]">{p.nome}</span>
+                    <span className="text-sm text-primary-700 font-semibold tabular-nums">
+                      R$ {p.preco_venda.toFixed(2)}
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
           )}
         </div>
 
-        <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
-          <div className="flex-1 min-h-[280px] lg:min-h-0">
-            <CartPanel
-              items={cart}
-              onQtyChange={setCartQty}
-              onRemove={removeFromCart}
-              total={cartTotal}
-            />
-          </div>
-          <PaymentPanel
-            total={cartTotal}
-            paymentType={paymentType}
-            onPaymentTypeChange={setPaymentType}
-            valueReceived={valueReceived}
-            onValueReceivedChange={setValueReceived}
-            onFinish={handleFinish}
-            submitting={submitting}
-          />
-        </div>
+        {/* Checkout fixo à direita no desktop/tablet horizontal */}
+        <div className="hidden lg:flex w-[400px] flex-col gap-4 shrink-0">{checkout}</div>
       </div>
+
+      {/* Mobile: barra fixa inferior + carrinho em bottom-sheet */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileCartOpen(true)}
+          className="flex min-h-[52px] w-full cursor-pointer items-center justify-between rounded-lg bg-primary-700 px-4 text-white transition-colors duration-150 hover:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-400"
+        >
+          <span className="text-sm font-medium">
+            {cartCount > 0 ? `${cartCount} ${cartCount === 1 ? "item" : "itens"}` : "Carrinho vazio"}
+          </span>
+          <span className="font-heading text-lg font-bold tabular-nums">R$ {cartTotal.toFixed(2)}</span>
+        </button>
+      </div>
+      {mobileCartOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/50" aria-hidden onClick={() => setMobileCartOpen(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Carrinho e pagamento"
+            className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col gap-3 overflow-y-auto rounded-t-2xl bg-gray-50 p-4"
+          >
+            <div className="mx-auto h-1.5 w-10 shrink-0 rounded-full bg-gray-300" aria-hidden />
+            {checkout}
+            <button
+              type="button"
+              onClick={() => setMobileCartOpen(false)}
+              className="min-h-[44px] cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              Continuar comprando
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6">
         <DailySalesList
           sales={salesToday}
           onRecibo={(id) => window.open(`/recibo/${id}`, "_blank")}
-          onCancel={handleCancelSale}
+          onCancel={(id) => setCancelSaleId(id)}
           filterMin={filterMin}
           filterMax={filterMax}
           onFilterMinChange={setFilterMin}
@@ -392,6 +533,27 @@ export default function VendasPage() {
         />
         <DailySummaryFooter data={summary} loading={summaryLoading} />
       </div>
+
+      <SaleSuccessModal
+        open={successSale != null}
+        saleId={successSale?.id ?? null}
+        troco={successSale?.troco ?? 0}
+        onNewSale={() => {
+          setSuccessSale(null);
+          searchRef.current?.focus();
+        }}
+      />
+
+      <ConfirmModal
+        open={cancelSaleId != null}
+        onClose={() => setCancelSaleId(null)}
+        onConfirm={confirmCancelSale}
+        title="Estornar venda"
+        message="Estornar esta venda? Os itens voltam para o estoque e a venda sai do total do dia."
+        confirmLabel="Estornar"
+        variant="danger"
+        loading={cancelLoading}
+      />
     </div>
   );
 }

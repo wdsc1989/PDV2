@@ -114,6 +114,17 @@ export async function apiDownload(path: string, filename: string): Promise<void>
   URL.revokeObjectURL(url);
 }
 
+/** URL absoluta para arquivos servidos pelo backend (ex.: /uploads/products/x.jpg). */
+export function assetUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:/.test(path)) return path;
+  const base =
+    typeof window !== "undefined"
+      ? process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+      : "";
+  return base + path;
+}
+
 export async function loginJson(username: string, password: string) {
   return apiFetch<{ access_token: string; refresh_token: string }>("/auth/login/json", {
     method: "POST",

@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -9,6 +12,14 @@ from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 
 router = APIRouter()
+
+UPLOAD_DIR = Path("uploads/products")
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 @router.get("/", response_model=list[ProductResponse])
@@ -88,6 +99,34 @@ def update_product(
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
+    return p
+
+
+@router.post("/{product_id}/image", response_model=ProductResponse)
+def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente"])),
+):
+    p = db.query(Product).filter(Product.id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    ext = ALLOWED_IMAGE_TYPES.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(status_code=415, detail="Formato inválido. Envie JPG, PNG ou WebP.")
+    content = file.file.read(MAX_IMAGE_BYTES + 1)
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Imagem muito grande (máx. 5 MB).")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    old = p.imagem_path
+    filename = f"{product_id}-{uuid4().hex[:8]}{ext}"
+    (UPLOAD_DIR / filename).write_bytes(content)
+    p.imagem_path = f"/uploads/products/{filename}"
+    db.commit()
+    db.refresh(p)
+    if old and old.startswith("/uploads/products/"):
+        Path(old.lstrip("/")).unlink(missing_ok=True)
     return p
 
 

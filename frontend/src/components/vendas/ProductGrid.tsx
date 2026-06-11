@@ -1,5 +1,6 @@
 "use client";
 
+import { assetUrl } from "@/api/client";
 import { Button, Badge } from "@/components/ui";
 
 export type ProductForGrid = {
@@ -62,7 +63,7 @@ export function ProductGrid({ products, onAdd, loading }: ProductGridProps) {
             >
               <div className="aspect-square bg-rose-50 rounded mb-2 flex items-center justify-center overflow-hidden">
                 {p.imagem_path ? (
-                  <img src={p.imagem_path} alt={p.nome} width={120} height={120} className="w-full h-full object-cover" />
+                  <img src={assetUrl(p.imagem_path) ?? undefined} alt={p.nome} width={120} height={120} loading="lazy" className="w-full h-full object-cover" />
                 ) : (
                   <PackageIcon />
                 )}
