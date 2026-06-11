@@ -20,14 +20,29 @@ def create_stock_entry(
     product = db.query(Product).filter(Product.id == body.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if body.quantity <= 0:
+        raise HTTPException(status_code=422, detail="Quantidade deve ser maior que zero")
+    if body.preco_custo_unitario is not None and body.preco_custo_unitario < 0:
+        raise HTTPException(status_code=422, detail="Custo unitário não pode ser negativo")
     entry = StockEntry(
         product_id=body.product_id,
         quantity=body.quantity,
+        preco_custo_unitario=body.preco_custo_unitario,
         data_entrada=body.data_entrada,
         observacao=body.observacao,
     )
     db.add(entry)
-    product.estoque_atual = (product.estoque_atual or 0) + body.quantity
+    estoque_anterior = product.estoque_atual or 0
+    # Custo médio ponderado: entradas com custo informado recalculam o custo do produto.
+    if body.preco_custo_unitario is not None:
+        custo_atual = product.preco_custo or 0.0
+        base = max(estoque_anterior, 0)
+        product.preco_custo = round(
+            (base * custo_atual + body.quantity * body.preco_custo_unitario)
+            / (base + body.quantity),
+            2,
+        )
+    product.estoque_atual = estoque_anterior + body.quantity
     db.commit()
     db.refresh(entry)
     return entry

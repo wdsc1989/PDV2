@@ -57,3 +57,13 @@ class SalesByHourRow(BaseModel):
     hour: int
     count: int
     total: float
+
+
+class CostVariationRow(BaseModel):
+    product_id: int
+    nome: str
+    custo_primeira_entrada: float
+    custo_ultima_entrada: float
+    variacao_percentual: float
+    custo_medio_atual: float
+    entradas_count: int

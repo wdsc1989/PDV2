@@ -14,6 +14,7 @@ from app.models.product import Product
 from app.models.product_category import ProductCategory
 from app.models.account_payable import AccountPayable
 from app.models.account_receivable import AccountReceivable
+from app.models.stock_entry import StockEntry
 from app.schemas.report import (
     ReportSummary,
     SalesByDayRow,
@@ -22,6 +23,7 @@ from app.schemas.report import (
     TopProductRow,
     StockRow,
     SalesByHourRow,
+    CostVariationRow,
 )
 
 router = APIRouter()
@@ -274,6 +276,58 @@ def stock_summary(
         )
         for p in products
     ]
+
+
+@router.get("/cost-variation", response_model=list[CostVariationRow])
+def cost_variation(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente"])),
+    days: Optional[int] = Query(30, ge=1, le=365),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
+):
+    """Variação do custo de compra por produto no período (entradas com custo informado)."""
+    start, end = _parse_period(data_inicio, data_fim, days)
+    entries = (
+        db.query(StockEntry)
+        .filter(
+            StockEntry.data_entrada >= start,
+            StockEntry.data_entrada <= end,
+            StockEntry.preco_custo_unitario.isnot(None),
+        )
+        .order_by(StockEntry.product_id, StockEntry.data_entrada, StockEntry.id)
+        .all()
+    )
+    por_produto: dict[int, list[StockEntry]] = {}
+    for e in entries:
+        por_produto.setdefault(e.product_id, []).append(e)
+    if not por_produto:
+        return []
+    produtos = {
+        p.id: p
+        for p in db.query(Product).filter(Product.id.in_(por_produto.keys())).all()
+    }
+    rows = []
+    for pid, lote in por_produto.items():
+        p = produtos.get(pid)
+        if p is None:
+            continue
+        primeiro = lote[0].preco_custo_unitario or 0.0
+        ultimo = lote[-1].preco_custo_unitario or 0.0
+        variacao = ((ultimo - primeiro) / primeiro * 100) if primeiro else 0.0
+        rows.append(
+            CostVariationRow(
+                product_id=pid,
+                nome=p.nome,
+                custo_primeira_entrada=round(primeiro, 2),
+                custo_ultima_entrada=round(ultimo, 2),
+                variacao_percentual=round(variacao, 2),
+                custo_medio_atual=round(p.preco_custo or 0.0, 2),
+                entradas_count=len(lote),
+            )
+        )
+    rows.sort(key=lambda r: abs(r.variacao_percentual), reverse=True)
+    return rows
 
 
 @router.get("/sales-by-hour", response_model=list[SalesByHourRow])
