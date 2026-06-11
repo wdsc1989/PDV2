@@ -19,6 +19,17 @@ def _get_open_session(db: Session) -> CashSession | None:
     return db.query(CashSession).filter(CashSession.status == "aberta").first()
 
 
+def _sale_for_role(sale: Sale, role: str) -> SaleResponse:
+    """Vendedor não enxerga lucro nem custo — campos saem como None."""
+    resp = SaleResponse.model_validate(sale)
+    if role == "vendedor":
+        resp.total_lucro = None
+        for item in resp.itens:
+            item.preco_custo_unitario = None
+            item.lucro_item = None
+    return resp
+
+
 @router.post("/", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
 def create_sale(
     body: SaleCreate,
@@ -94,7 +105,7 @@ def list_sales(
     limit: int = 100,
 ):
     sales = db.query(Sale).order_by(Sale.id.desc()).offset(skip).limit(limit).all()
-    return sales
+    return [_sale_for_role(s, user.role) for s in sales]
 
 
 @router.get("/{sale_id}", response_model=SaleResponse)
@@ -106,7 +117,7 @@ def get_sale(
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
-    return sale
+    return _sale_for_role(sale, user.role)
 
 
 class SaleUpdate(BaseModel):
@@ -118,7 +129,8 @@ def update_sale(
     sale_id: int,
     body: SaleUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    # Estorno devolve estoque e altera o fechamento — só admin/gerente.
+    user: User = Depends(require_roles(["admin", "gerente"])),
 ):
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     if not sale:

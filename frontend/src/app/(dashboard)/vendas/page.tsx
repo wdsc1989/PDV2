@@ -29,7 +29,7 @@ const AUTOCOMPLETE_LIMIT = 10;
 const RELATED_LIMIT = 4;
 
 export default function VendasPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const searchRef = useRef<HTMLInputElement>(null);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -526,6 +526,7 @@ export default function VendasPage() {
           sales={salesToday}
           onRecibo={(id) => window.open(`/recibo/${id}`, "_blank")}
           onCancel={(id) => setCancelSaleId(id)}
+          canCancel={user?.role !== "vendedor"}
           filterMin={filterMin}
           filterMax={filterMax}
           onFilterMinChange={setFilterMin}

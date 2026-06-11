@@ -20,8 +20,10 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (mounted && auth.isAuthenticated()) router.replace("/");
-  }, [mounted, auth.isAuthenticated(), router]);
+    if (mounted && auth.isAuthenticated()) {
+      router.replace(auth.user?.role === "vendedor" ? "/vendas" : "/");
+    }
+  }, [mounted, auth.isAuthenticated(), auth.user?.role, router]);
 
   if (!mounted) {
     return (
@@ -48,7 +50,8 @@ export default function LoginPage() {
       auth.setTokens(tokens.access_token, tokens.refresh_token);
       const user = await apiFetch<{ id: number; username: string; name: string; role: string }>("/auth/me");
       auth.setUser(user);
-      router.replace("/");
+      // vendedor trabalha na venda — vai direto para a tela principal dele
+      router.replace(user.role === "vendedor" ? "/vendas" : "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao entrar");
     } finally {

@@ -20,9 +20,10 @@ class SaleItemResponse(BaseModel):
     product_id: int
     quantidade: float
     preco_unitario: float
-    preco_custo_unitario: float
+    # None quando o usuário não pode ver custo/lucro (vendedor).
+    preco_custo_unitario: float | None
     subtotal: float
-    lucro_item: float
+    lucro_item: float | None
 
     class Config:
         from_attributes = True
@@ -33,7 +34,8 @@ class SaleResponse(BaseModel):
     cash_session_id: int
     data_venda: date
     total_vendido: float
-    total_lucro: float
+    # None quando o usuário não pode ver lucro (vendedor).
+    total_lucro: float | None
     total_pecas: int
     tipo_pagamento: str | None
     status: str

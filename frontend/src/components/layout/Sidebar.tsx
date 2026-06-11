@@ -18,16 +18,17 @@ import {
   IconRobot,
 } from "./icons";
 
+// Vendedor vê só o essencial da operação (vendas, caixa, sobre) — menos menus, menos cliques.
 const navItems: { href: string; label: string; roles: string[]; Icon: React.ComponentType }[] = [
-  { href: "/", label: "Início", roles: ["admin", "gerente", "vendedor"], Icon: IconHome },
-  { href: "/caixa", label: "Caixa", roles: ["admin", "gerente", "vendedor"], Icon: IconCash },
+  { href: "/", label: "Início", roles: ["admin", "gerente"], Icon: IconHome },
   { href: "/vendas", label: "Vendas", roles: ["admin", "gerente", "vendedor"], Icon: IconCart },
+  { href: "/caixa", label: "Caixa", roles: ["admin", "gerente", "vendedor"], Icon: IconCash },
   { href: "/produtos", label: "Produtos", roles: ["admin", "gerente"], Icon: IconPackage },
-  { href: "/estoque", label: "Estoque", roles: ["admin", "gerente", "vendedor"], Icon: IconArchive },
+  { href: "/estoque", label: "Estoque", roles: ["admin", "gerente"], Icon: IconArchive },
   { href: "/categorias", label: "Categorias", roles: ["admin", "gerente"], Icon: IconTag },
   { href: "/contas", label: "Contas", roles: ["admin", "gerente"], Icon: IconReceipt },
-  { href: "/acessorios", label: "Acessórios", roles: ["admin", "gerente", "vendedor"], Icon: IconPuzzle },
-  { href: "/relatorios", label: "Relatórios", roles: ["admin", "gerente", "vendedor"], Icon: IconBarChart },
+  { href: "/acessorios", label: "Acessórios", roles: ["admin", "gerente"], Icon: IconPuzzle },
+  { href: "/relatorios", label: "Relatórios", roles: ["admin", "gerente"], Icon: IconBarChart },
   { href: "/agente-relatorios", label: "Agente Relatórios", roles: ["admin", "gerente"], Icon: IconRobot },
   { href: "/agente-contas", label: "Agente Contas", roles: ["admin", "gerente"], Icon: IconRobot },
   { href: "/admin", label: "Administração", roles: ["admin"], Icon: IconSettings },

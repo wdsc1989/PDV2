@@ -113,16 +113,18 @@ def report_summary(
         .scalar() or 0
     )
 
+    # Vendedor não enxerga lucro nem custo de estoque (apenas admin/gerente).
+    is_vendedor = user.role == "vendedor"
     return ReportSummary(
         total_vendas_hoje=total_hoje,
         total_vendas_periodo=total_periodo,
-        total_lucro_periodo=lucro_periodo,
+        total_lucro_periodo=0.0 if is_vendedor else lucro_periodo,
         caixa_aberto=caixa is not None,
         vendas_count_hoje=count_hoje,
         vendas_count_periodo=count_periodo,
         ticket_medio_periodo=round(ticket_medio, 2),
         contas_vencidas_count=int(contas_vencidas),
-        valor_estoque_custo=round(valor_estoque_custo, 2),
+        valor_estoque_custo=0.0 if is_vendedor else round(valor_estoque_custo, 2),
         valor_estoque_venda=round(valor_estoque_venda, 2),
         produtos_estoque_critico_count=int(estoque_critico),
     )
@@ -131,7 +133,7 @@ def report_summary(
 @router.get("/sales-by-day", response_model=list[SalesByDayRow])
 def sales_by_day(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     days: Optional[int] = Query(30, ge=1, le=365),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
@@ -157,7 +159,7 @@ def sales_by_day(
 @router.get("/sales-by-category", response_model=list[SalesByCategoryRow])
 def sales_by_category(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     days: Optional[int] = Query(30, ge=1, le=365),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
@@ -190,7 +192,7 @@ def sales_by_category(
 @router.get("/sales-by-payment", response_model=list[SalesByPaymentRow])
 def sales_by_payment(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     days: Optional[int] = Query(30, ge=1, le=365),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
@@ -215,7 +217,7 @@ def sales_by_payment(
 @router.get("/top-products", response_model=list[TopProductRow])
 def top_products(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     days: Optional[int] = Query(30, ge=1, le=365),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
@@ -253,7 +255,7 @@ def top_products(
 @router.get("/stock-summary", response_model=list[StockRow])
 def stock_summary(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     categoria_id: Optional[int] = Query(None),
 ):
     q = db.query(Product).filter(Product.ativo.is_(True))
@@ -333,7 +335,7 @@ def cost_variation(
 @router.get("/sales-by-hour", response_model=list[SalesByHourRow])
 def sales_by_hour(
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user: User = Depends(require_roles(["admin", "gerente"])),
     days: Optional[int] = Query(30, ge=1, le=365),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),

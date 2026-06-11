@@ -14,6 +14,8 @@ export interface DailySalesListProps {
   sales: SaleForList[];
   onRecibo: (id: number) => void;
   onCancel: (id: number) => void;
+  /** Estorno devolve estoque — só admin/gerente (o backend também bloqueia). */
+  canCancel?: boolean;
   filterMin?: string;
   filterMax?: string;
   onFilterMinChange?: (v: string) => void;
@@ -24,6 +26,7 @@ export function DailySalesList({
   sales,
   onRecibo,
   onCancel,
+  canCancel = true,
   filterMin = "",
   filterMax = "",
   onFilterMinChange,
@@ -104,13 +107,15 @@ export function DailySalesList({
                       >
                         Recibo
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onCancel(s.id)}
-                        className="text-red-600 hover:underline text-sm"
-                      >
-                        Estornar
-                      </button>
+                      {canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => onCancel(s.id)}
+                          className="text-red-600 hover:underline text-sm"
+                        >
+                          Estornar
+                        </button>
+                      )}
                     </span>
                   )}
                 </td>
