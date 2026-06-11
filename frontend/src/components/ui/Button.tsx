@@ -2,6 +2,8 @@
 
 import { ButtonHTMLAttributes } from "react";
 
+import { Spinner } from "./Spinner";
+
 type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "sm" | "md" | "lg";
 
@@ -21,6 +23,8 @@ const sizeClasses: Record<Size, string> = {
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
+  /** Desabilita o botão e mostra spinner durante ação assíncrona (evita duplo clique). */
+  loading?: boolean;
 }
 
 export function Button({
@@ -28,6 +32,7 @@ export function Button({
   size = "md",
   className = "",
   disabled,
+  loading = false,
   children,
   type = "button",
   ...rest
@@ -35,10 +40,12 @@ export function Button({
   return (
     <button
       type={type}
-      className={`rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...rest}
     >
+      {loading && <Spinner className="h-4 w-4" />}
       {children}
     </button>
   );
