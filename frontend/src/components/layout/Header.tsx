@@ -22,9 +22,24 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!notifOpen) return;
-    apiFetch<Summary>("/reports/summary?days=1").then(setSummary).catch(() => setSummary(null));
-    apiFetch<CashSession>("/cash/current").then(setCashSession).catch(() => setCashSession(null));
+    // Busca inicial e periódica em segundo plano (tempo real)
+    function fetchNotifications() {
+      apiFetch<Summary>("/reports/summary?days=1").then(setSummary).catch(() => setSummary(null));
+      apiFetch<CashSession>("/cash/current").then(setCashSession).catch(() => setCashSession(null));
+    }
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Polling a cada 30 segundos
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Sincronização instantânea ao clicar no sino
+    if (notifOpen) {
+      apiFetch<Summary>("/reports/summary?days=1").then(setSummary).catch(() => setSummary(null));
+      apiFetch<CashSession>("/cash/current").then(setCashSession).catch(() => setCashSession(null));
+    }
   }, [notifOpen]);
 
   useEffect(() => {
