@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
-import { loginJson, apiFetch } from "@/api/client";
+import { loginJson, apiFetch, assetUrl } from "@/api/client";
 import { Button, Input, Label } from "@/components/ui";
 
 export default function LoginPage() {
@@ -17,6 +17,29 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState<{
+    store_name: string;
+    logo_path: string | null;
+    logo_box_height_login: number | null;
+    logo_size_login: number | null;
+    logo_width_login: number | null;
+    logo_position_login: string | null;
+    logo_fit_login: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    apiFetch<{
+      store_name: string;
+      logo_path: string | null;
+      logo_box_height_login: number | null;
+      logo_size_login: number | null;
+      logo_width_login: number | null;
+      logo_position_login: string | null;
+      logo_fit_login: string | null;
+    }>("/settings")
+      .then(setSettings)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -70,8 +93,37 @@ export default function LoginPage() {
   return (
     <div className="min-h-dvh flex items-center justify-center bg-gradient-to-b from-rose-50 to-white p-4">
       <div className="w-full max-w-sm rounded-xl border border-rose-100 bg-white p-6 shadow-sm">
-        <h1 className="font-heading mb-1 text-center text-2xl font-bold text-primary-700">PDV2</h1>
-        <p className="mb-6 text-center text-sm text-gray-500">Entre para começar a vender</p>
+        <div className={`flex flex-col mb-6 w-full ${settings?.logo_box_height_login ? "justify-center" : ""} ${
+          settings?.logo_position_login === "left"
+            ? "items-start"
+            : settings?.logo_position_login === "right"
+            ? "items-end"
+            : "items-center"
+        }`}
+        style={{ height: settings?.logo_box_height_login ? `${settings.logo_box_height_login}px` : "auto" }}
+        >
+          {settings?.logo_path ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={assetUrl(settings.logo_path) ?? undefined}
+              alt={settings.store_name}
+              style={{
+                height: settings?.logo_size_login ? `${settings.logo_size_login}px` : "100%",
+                width: settings?.logo_width_login ? `${settings.logo_width_login}px` : "auto",
+                objectFit: (settings?.logo_fit_login || "contain") as any,
+              }}
+              className="mb-4 hover:scale-102 transition-transform duration-300 drop-shadow-md"
+            />
+          ) : (
+            <>
+              <h1 className="font-heading text-2xl font-bold text-primary-700 mb-1">PDV2</h1>
+              <h2 className="font-heading text-lg font-black text-gray-800 text-center leading-snug">
+                {settings?.store_name || "Vieira Closet Boutique"}
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">Painel de Vendas e Controle</p>
+            </>
+          )}
+        </div>
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="login-user">Usuário</Label>
@@ -87,7 +139,6 @@ export default function LoginPage() {
                 setUsername(e.target.value);
                 if (usernameError && e.target.value.trim()) setUsernameError("");
               }}
-              onBlur={() => setUsernameError(username.trim() ? "" : "Informe o usuário.")}
             />
             {usernameError && <p role="alert" className="mt-1 text-xs text-red-600">{usernameError}</p>}
           </div>
@@ -105,7 +156,6 @@ export default function LoginPage() {
                   setPassword(e.target.value);
                   if (passwordError && e.target.value) setPasswordError("");
                 }}
-                onBlur={() => setPasswordError(password ? "" : "Informe a senha.")}
               />
               <button
                 type="button"

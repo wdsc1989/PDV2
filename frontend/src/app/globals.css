@@ -3,25 +3,34 @@
 @tailwind utilities;
 
 :root {
-  /* Paleta boutique/moda — fashion rose + gold accent */
-  --color-primary: #BE185D;
-  --color-primary-dark: #9D174D;
-  --color-secondary: #EC4899;
-  --color-accent: #D97706;
+  /* Paleta boutique de luxo — bege com dourado (E-commerce Luxury) */
+  --color-primary: #A16207;
+  --color-primary-dark: #854D0E;
+  --color-secondary: #854D0E;
+  --color-accent: #A16207;
   --color-success: #16a34a;
   --color-warning: #d97706;
   --color-danger: #dc2626;
   --color-info: #3b82f6;
-  --color-background: #FDF2F8;
-  --color-muted: #FBF1F5;
-  --color-border: #F7E3EB;
+  --color-background: #FAFAF9;
+  --color-muted: #F5F5F4;
+  --color-border: #E7E5E4;
   --spacing-section: 1.5rem;
   --spacing-card-gap: 1rem;
   --radius-card: 0.5rem;
 }
 
 body {
-  @apply bg-[#FDF2F8] text-gray-900;
+  font-family: var(--font-montserrat), var(--font-nunito), sans-serif;
+  @apply bg-[#FAFAF9] text-gray-900;
+}
+
+.font-serif {
+  font-family: var(--font-cormorant), Georgia, serif;
+}
+
+.font-sans {
+  font-family: var(--font-montserrat), var(--font-nunito), sans-serif;
 }
 
 /* Impressão (recibo, relatórios): só o conteúdo, sem navegação nem fundo rosa */

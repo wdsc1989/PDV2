@@ -2,16 +2,19 @@
 
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/auth";
-import { apiFetch } from "@/api/client";
+import { apiFetch, assetUrl } from "@/api/client";
 import { Input, Label, toast, ConfirmModal } from "@/components/ui";
 import {
   ProductGrid,
   CartPanel,
   PaymentPanel,
+  PaymentBar,
   DailySalesList,
   DailySummaryFooter,
   CashStatusBanner,
   SaleSuccessModal,
+  ClientSelector,
+  type Client,
   type ProductForGrid,
   type CartItemForPanel,
   type PaymentType,
@@ -27,6 +30,17 @@ type Sale = SaleForList & { total_lucro?: number; created_at?: string };
 const today = () => new Date().toISOString().slice(0, 10);
 const AUTOCOMPLETE_LIMIT = 10;
 const RELATED_LIMIT = 4;
+
+function PackageIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      className={className} aria-hidden="true">
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
+    </svg>
+  );
+}
 
 export default function VendasPage() {
   const { isAuthenticated, user } = useAuthStore();
@@ -44,6 +58,8 @@ export default function VendasPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentType, setPaymentType] = useState<PaymentType>("dinheiro");
   const [valueReceived, setValueReceived] = useState("");
+  const [descontoTipo, setDescontoTipo] = useState<"percentual" | "valor">("percentual");
+  const [descontoInput, setDescontoInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -52,11 +68,13 @@ export default function VendasPage() {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [hoverPreview, setHoverPreview] = useState<{ src: string; nome: string } | null>(null);
   const [lastAddedProductId, setLastAddedProductId] = useState<number | null>(null);
   const [successSale, setSuccessSale] = useState<{ id: number; troco: number } | null>(null);
   const [cancelSaleId, setCancelSaleId] = useState<number | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const loadProducts = () => {
     setProductsLoading(true);
@@ -181,7 +199,10 @@ export default function VendasPage() {
   async function handleSearchEnter() {
     const term = searchQuery.trim();
     if (!term) return;
-    const exactLocal = suggestions.find((s) => s.codigo.toLowerCase() === term.toLowerCase());
+    const matchCode = (s: Product) =>
+      s.codigo.toLowerCase() === term.toLowerCase() ||
+      (s.codigo_barras ?? "").toLowerCase() === term.toLowerCase();
+    const exactLocal = suggestions.find(matchCode);
     if (exactLocal) {
       selectSuggestion(exactLocal);
       return;
@@ -192,7 +213,7 @@ export default function VendasPage() {
       params.set("active_only", "true");
       params.set("q", term);
       const list = await apiFetch<Product[]>(`/products?${params}`);
-      const exact = list.find((s) => s.codigo.toLowerCase() === term.toLowerCase());
+      const exact = list.find(matchCode);
       const pick = exact ?? list[0];
       if (pick) {
         selectSuggestion(pick);
@@ -225,13 +246,26 @@ export default function VendasPage() {
     setCart((prev) => prev.filter((c) => c.product_id !== productId));
   }
 
+  function clearCart() {
+    setCart([]);
+    setValueReceived("");
+    setDescontoInput("");
+  }
+
   const cartTotal = cart.reduce((s, c) => s + c.subtotal, 0);
   const cartCount = cart.reduce((s, c) => s + c.quantidade, 0);
+  const descontoValor = (() => {
+    const v = parseFloat(descontoInput) || 0;
+    if (v <= 0 || cartTotal <= 0) return 0;
+    const d = descontoTipo === "percentual" ? cartTotal * (v / 100) : v;
+    return Math.max(0, Math.min(d, cartTotal));
+  })();
+  const cartTotalLiquido = Math.max(0, +(cartTotal - descontoValor).toFixed(2));
   const cashClosed = !cashLoading && !cashSession;
 
   const handleFinish = useCallback(async () => {
     if (cart.length === 0) {
-      toast.error("Adicione pelo menos um item ao carrinho.");
+      toast.error("Adicione pelo menos um item à sacola.");
       return;
     }
     if (cashClosed) {
@@ -239,16 +273,20 @@ export default function VendasPage() {
       return;
     }
     const received = parseFloat(valueReceived) || 0;
-    if (paymentType === "dinheiro" && received < cartTotal) {
+    if (paymentType === "dinheiro" && received < cartTotalLiquido) {
       toast.error("Valor recebido insuficiente.");
       return;
     }
     setSubmitting(true);
     try {
+      const descInput = parseFloat(descontoInput) || 0;
       const res = await apiFetch<{ id: number }>("/sales", {
         method: "POST",
         body: JSON.stringify({
           tipo_pagamento: paymentType,
+          desconto_tipo: descInput > 0 ? descontoTipo : null,
+          desconto_input: descInput > 0 ? descInput : null,
+          client_id: selectedClient?.id ?? null,
           itens: cart.map((c) => ({
             product_id: c.product_id,
             quantidade: c.quantidade,
@@ -257,9 +295,11 @@ export default function VendasPage() {
           })),
         }),
       });
-      const troco = paymentType === "dinheiro" ? Math.max(0, received - cartTotal) : 0;
+      const troco = paymentType === "dinheiro" ? Math.max(0, received - cartTotalLiquido) : 0;
       setCart([]);
       setValueReceived("");
+      setDescontoInput("");
+      setSelectedClient(null);
       setMobileCartOpen(false);
       setSuccessSale({ id: res.id, troco });
       loadSales();
@@ -270,7 +310,7 @@ export default function VendasPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [cart, paymentType, valueReceived, cartTotal, cashClosed]);
+  }, [cart, paymentType, valueReceived, cartTotalLiquido, descontoInput, descontoTipo, cashClosed, selectedClient]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -283,8 +323,7 @@ export default function VendasPage() {
       if (e.key === "F5") {
         e.preventDefault();
         if (!inInput && cart.length > 0 && !cashClosed) {
-          const total = cart.reduce((s, c) => s + c.subtotal, 0);
-          const canFinish = paymentType !== "dinheiro" || (parseFloat(valueReceived) || 0) >= total;
+          const canFinish = paymentType !== "dinheiro" || (parseFloat(valueReceived) || 0) >= cartTotalLiquido;
           if (canFinish) handleFinish();
         }
       }
@@ -304,7 +343,7 @@ export default function VendasPage() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cart, paymentType, valueReceived, handleFinish, showSuggestions, cashClosed, mobileCartOpen]);
+  }, [cart, paymentType, valueReceived, cartTotalLiquido, handleFinish, showSuggestions, cashClosed, mobileCartOpen]);
 
   function confirmCancelSale() {
     if (cancelSaleId == null) return;
@@ -338,12 +377,28 @@ export default function VendasPage() {
   const paymentDisabledReason = cashClosed ? "Caixa fechado — abra o caixa para finalizar." : null;
 
   const checkout = (
-    <>
+    <div className="space-y-4">
+      <ClientSelector
+        selectedClientId={selectedClient?.id ?? null}
+        onSelectClient={setSelectedClient}
+      />
       <div className="flex-1 min-h-[280px] lg:min-h-0">
-        <CartPanel items={cart} onQtyChange={setCartQty} onRemove={removeFromCart} total={cartTotal} />
+        <CartPanel
+          items={cart}
+          onQtyChange={setCartQty}
+          onRemove={removeFromCart}
+          onClear={clearCart}
+          total={cartTotalLiquido}
+        />
       </div>
       <PaymentPanel
-        total={cartTotal}
+        total={cartTotalLiquido}
+        subtotalBruto={cartTotal}
+        descontoTipo={descontoTipo}
+        onDescontoTipoChange={setDescontoTipo}
+        descontoInput={descontoInput}
+        onDescontoInputChange={setDescontoInput}
+        descontoValor={descontoValor}
         paymentType={paymentType}
         onPaymentTypeChange={setPaymentType}
         valueReceived={valueReceived}
@@ -352,11 +407,11 @@ export default function VendasPage() {
         submitting={submitting}
         disabledReason={paymentDisabledReason}
       />
-    </>
+    </div>
   );
 
   return (
-    <div className="flex flex-col h-full pb-20 lg:pb-0">
+    <div className="pb-24 lg:pb-32">
       <h1 className="font-heading text-2xl font-bold text-gray-900 mb-4">Vendas</h1>
 
       <CashStatusBanner
@@ -368,7 +423,7 @@ export default function VendasPage() {
         }}
       />
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1 min-w-0 flex flex-col">
           <div ref={searchWrapRef} className="relative mb-3">
             <Label htmlFor="search">Buscar produto (F2) — código de barras adiciona direto</Label>
@@ -389,28 +444,47 @@ export default function VendasPage() {
               }}
             />
             {showSuggestions && (
-              <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+              <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-auto">
                 {suggestionsLoading ? (
                   <li className="px-3 py-2 text-sm text-gray-500">Buscando...</li>
                 ) : suggestions.length === 0 ? (
                   <li className="px-3 py-2 text-sm text-gray-500">Nenhum resultado</li>
                 ) : (
-                  suggestions.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        className="w-full min-h-[44px] cursor-pointer text-left px-3 py-2 text-sm hover:bg-rose-50 flex justify-between items-center"
-                        onClick={() => selectSuggestion(p)}
-                      >
-                        <span className="truncate">{p.nome}</span>
-                        <span className="text-primary-700 font-semibold tabular-nums shrink-0 ml-2">
-                          R$ {p.preco_venda.toFixed(2)}
-                        </span>
-                      </button>
-                    </li>
-                  ))
+                  suggestions.map((p) => {
+                    const thumb = p.imagem_path ? assetUrl(p.imagem_path) : null;
+                    return (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          className="w-full min-h-[44px] cursor-pointer text-left px-3 py-2 text-sm hover:bg-rose-50 flex items-center gap-3"
+                          onClick={() => selectSuggestion(p)}
+                          onMouseEnter={() => setHoverPreview(thumb ? { src: thumb, nome: p.nome } : null)}
+                          onMouseLeave={() => setHoverPreview(null)}
+                        >
+                          <span className="shrink-0 w-10 h-10 rounded bg-rose-50 flex items-center justify-center overflow-hidden">
+                            {thumb ? (
+                              <img src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+                            ) : (
+                              <PackageIcon className="w-5 h-5 text-rose-300" />
+                            )}
+                          </span>
+                          <span className="truncate flex-1">{p.nome}</span>
+                          <span className="text-primary-700 font-semibold tabular-nums shrink-0 ml-2">
+                            R$ {p.preco_venda.toFixed(2)}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
                 )}
               </ul>
+            )}
+            {/* Zoom da imagem ao aproximar o mouse (oculto no mobile) */}
+            {showSuggestions && hoverPreview && (
+              <div className="hidden sm:block absolute z-20 top-full left-full ml-3 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-xl pointer-events-none">
+                <img src={hoverPreview.src} alt={hoverPreview.nome} className="w-full h-56 object-contain rounded" />
+                <p className="mt-1 text-xs text-gray-600 text-center truncate">{hoverPreview.nome}</p>
+              </div>
             )}
           </div>
 
@@ -451,7 +525,7 @@ export default function VendasPage() {
             })}
           </div>
 
-          <div className="flex-1 min-h-[300px] overflow-auto">
+          <div className="min-h-[300px]">
             <ProductGrid
               products={products.filter((p) => p.estoque_atual > 0)}
               onAdd={addToCart}
@@ -482,11 +556,43 @@ export default function VendasPage() {
           )}
         </div>
 
-        {/* Checkout fixo à direita no desktop/tablet horizontal */}
-        <div className="hidden lg:flex w-[400px] flex-col gap-4 shrink-0">{checkout}</div>
+        {/* Sacola (produtos) na lateral — rolagem própria, bem visível. O pagamento fica na barra inferior fixa. */}
+        <aside className="hidden lg:block w-[360px] shrink-0 self-start sticky top-4 space-y-4">
+          <ClientSelector
+            selectedClientId={selectedClient?.id ?? null}
+            onSelectClient={setSelectedClient}
+          />
+          <CartPanel
+            items={cart}
+            onQtyChange={setCartQty}
+            onRemove={removeFromCart}
+            onClear={clearCart}
+            total={cartTotalLiquido}
+          />
+        </aside>
       </div>
 
-      {/* Mobile: barra fixa inferior + carrinho em bottom-sheet */}
+      {/* Barra de pagamento fixa no rodapé (desktop) — sempre visível */}
+      <div className="hidden lg:block fixed bottom-0 left-64 right-0 z-20 border-t border-rose-100 bg-white px-6 py-3 shadow-[0_-2px_12px_rgba(0,0,0,0.08)]">
+        <PaymentBar
+          total={cartTotalLiquido}
+          subtotalBruto={cartTotal}
+          descontoTipo={descontoTipo}
+          onDescontoTipoChange={setDescontoTipo}
+          descontoInput={descontoInput}
+          onDescontoInputChange={setDescontoInput}
+          descontoValor={descontoValor}
+          paymentType={paymentType}
+          onPaymentTypeChange={setPaymentType}
+          valueReceived={valueReceived}
+          onValueReceivedChange={setValueReceived}
+          onFinish={handleFinish}
+          submitting={submitting}
+          disabledReason={paymentDisabledReason}
+        />
+      </div>
+
+      {/* Mobile: barra fixa inferior + sacola em bottom-sheet */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white p-3 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] lg:hidden">
         <button
           type="button"
@@ -494,9 +600,9 @@ export default function VendasPage() {
           className="flex min-h-[52px] w-full cursor-pointer items-center justify-between rounded-lg bg-primary-700 px-4 text-white transition-colors duration-150 hover:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-400"
         >
           <span className="text-sm font-medium">
-            {cartCount > 0 ? `${cartCount} ${cartCount === 1 ? "item" : "itens"}` : "Carrinho vazio"}
+            {cartCount > 0 ? `${cartCount} ${cartCount === 1 ? "item" : "itens"}` : "Sacola vazia"}
           </span>
-          <span className="font-heading text-lg font-bold tabular-nums">R$ {cartTotal.toFixed(2)}</span>
+          <span className="font-heading text-lg font-bold tabular-nums">R$ {cartTotalLiquido.toFixed(2)}</span>
         </button>
       </div>
       {mobileCartOpen && (
@@ -505,7 +611,7 @@ export default function VendasPage() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Carrinho e pagamento"
+            aria-label="Sacola e pagamento"
             className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col gap-3 overflow-y-auto rounded-t-2xl bg-gray-50 p-4"
           >
             <div className="mx-auto h-1.5 w-10 shrink-0 rounded-full bg-gray-300" aria-hidden />
@@ -521,20 +627,6 @@ export default function VendasPage() {
         </div>
       )}
 
-      <div className="mt-6">
-        <DailySalesList
-          sales={salesToday}
-          onRecibo={(id) => window.open(`/recibo/${id}`, "_blank")}
-          onCancel={(id) => setCancelSaleId(id)}
-          canCancel={user?.role !== "vendedor"}
-          filterMin={filterMin}
-          filterMax={filterMax}
-          onFilterMinChange={setFilterMin}
-          onFilterMaxChange={setFilterMax}
-        />
-        <DailySummaryFooter data={summary} loading={summaryLoading} />
-      </div>
-
       <SaleSuccessModal
         open={successSale != null}
         saleId={successSale?.id ?? null}
@@ -545,16 +637,6 @@ export default function VendasPage() {
         }}
       />
 
-      <ConfirmModal
-        open={cancelSaleId != null}
-        onClose={() => setCancelSaleId(null)}
-        onConfirm={confirmCancelSale}
-        title="Estornar venda"
-        message="Estornar esta venda? Os itens voltam para o estoque e a venda sai do total do dia."
-        confirmLabel="Estornar"
-        variant="danger"
-        loading={cancelLoading}
-      />
     </div>
   );
 }

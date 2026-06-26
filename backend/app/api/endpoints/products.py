@@ -19,7 +19,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
 
 @router.get("/", response_model=list[ProductResponse])
@@ -41,6 +41,7 @@ def list_products(
             or_(
                 Product.nome.ilike(term),
                 Product.codigo.ilike(term),
+                Product.codigo_barras.ilike(term),
                 Product.categoria.ilike(term),
             )
         )
@@ -53,10 +54,52 @@ def create_product(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(["admin", "gerente"])),
 ):
-    if db.query(Product).filter(Product.codigo == body.codigo).first():
+    codigo_final = body.codigo.strip() if body.codigo else ""
+    if not codigo_final:
+        # Obter todos os códigos existentes para verificar a sequência
+        todos_codigos = [p[0] for p in db.query(Product.codigo).all() if p[0]]
+        
+        # Tenta obter o nome da categoria para o prefixo
+        nome_cat = None
+        if body.categoria_id:
+            from app.models.product_category import ProductCategory
+            cat_obj = db.query(ProductCategory).filter(ProductCategory.id == body.categoria_id).first()
+            if cat_obj:
+                nome_cat = cat_obj.nome
+        elif body.categoria:
+            nome_cat = body.categoria
+            
+        if nome_cat:
+            import unicodedata
+            nome_norm = unicodedata.normalize("NFKD", nome_cat)
+            nome_norm = "".join(
+                ch for ch in nome_norm if not unicodedata.combining(ch)
+            )
+            letras = "".join(ch for ch in nome_norm if ch.isalpha()).upper()
+            prefixo = letras[:4] if letras else "P"
+            nums = []
+            for c in todos_codigos:
+                if not c.startswith(prefixo):
+                    continue
+                sufixo = c[len(prefixo):]
+                if sufixo.isdigit():
+                    nums.append(int(sufixo))
+            prox = (max(nums) + 1) if nums else 1
+            codigo_final = f"{prefixo}{prox:03d}"
+        else:
+            nums = []
+            for c in todos_codigos:
+                if len(c) >= 2 and c.startswith("P") and c[1:].isdigit():
+                    nums.append(int(c[1:]))
+            prox = (max(nums) + 1) if nums else 1
+            codigo_final = f"P{prox:04d}"
+
+    if db.query(Product).filter(Product.codigo == codigo_final).first():
         raise HTTPException(status_code=400, detail="Product code already exists")
+
     p = Product(
-        codigo=body.codigo,
+        codigo=codigo_final,
+        codigo_barras=body.codigo_barras,
         nome=body.nome,
         categoria=body.categoria,
         marca=body.marca,
@@ -65,6 +108,8 @@ def create_product(
         estoque_atual=0.0,
         estoque_minimo=body.estoque_minimo,
         ativo=body.ativo,
+        no_catalogo=body.no_catalogo,
+        em_destaque=body.em_destaque,
         categoria_id=body.categoria_id,
     )
     db.add(p)

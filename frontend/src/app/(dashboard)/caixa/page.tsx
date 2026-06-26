@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
 import { Button, Card, Table, Input, Label, Badge, toast, KpiCard, ConfirmModal, PageHeader } from "@/components/ui";
+import { EditCashModal } from "@/components/caixa/EditCashModal";
 
 type CashSession = {
   id: number;
@@ -12,14 +13,18 @@ type CashSession = {
   data_fechamento: string | null;
   valor_abertura: number;
   valor_fechamento: number | null;
+  observacao: string | null;
 };
 type Sale = { id: number; cash_session_id: number; total_vendido: number; tipo_pagamento: string | null };
 
 const SESSION_ALERT_HOURS = 12;
 
 export default function CaixaPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
+  const [editingSession, setEditingSession] = useState<CashSession | null>(null);
   const [mounted, setMounted] = useState(false);
+
   const [session, setSession] = useState<CashSession | null>(null);
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -38,15 +43,41 @@ export default function CaixaPage() {
     Promise.all([
       apiFetch<CashSession | null>("/cash/current"),
       apiFetch<CashSession[]>("/cash/sessions?limit=50"),
-      apiFetch<Sale[]>("/sales?limit=500"),
     ])
-      .then(([current, list, salesList]) => {
+      .then(async ([current, list]) => {
         setSession(current);
         setSessions(list);
-        setSales(salesList);
+        if (current) {
+          try {
+            const salesList = await apiFetch<Sale[]>(`/sales?cash_session_id=${current.id}&limit=500`);
+            setSales(salesList);
+          } catch (e) {
+            console.error("Erro ao buscar vendas do caixa:", e);
+          }
+        } else {
+          setSales([]);
+        }
       })
       .finally(() => setLoading(false));
   }, [mounted, isAuthenticated]);
+
+  function reloadSessions() {
+    Promise.all([
+      apiFetch<CashSession | null>("/cash/current"),
+      apiFetch<CashSession[]>("/cash/sessions?limit=50"),
+    ]).then(async ([current, list]) => {
+      setSession(current);
+      setSessions(list);
+      if (current) {
+        try {
+          const salesList = await apiFetch<Sale[]>(`/sales?cash_session_id=${current.id}&limit=500`);
+          setSales(salesList);
+        } catch (e) {}
+      } else {
+        setSales([]);
+      }
+    }).catch(() => {});
+  }
 
   const sessionSales = session ? sales.filter((s) => s.cash_session_id === session.id) : [];
   const totalMovimentado = sessionSales.reduce((a, s) => a + s.total_vendido, 0);
@@ -72,12 +103,9 @@ export default function CaixaPage() {
       await apiFetch("/cash/open", { method: "POST", body: JSON.stringify({ valor_abertura: v }) });
       toast.success("Caixa aberto.");
       setValorAbertura("");
-      const [current, salesList] = await Promise.all([
-        apiFetch<CashSession | null>("/cash/current"),
-        apiFetch<Sale[]>("/sales?limit=500"),
-      ]);
+      const current = await apiFetch<CashSession | null>("/cash/current");
       setSession(current);
-      setSales(salesList);
+      setSales([]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao abrir");
     } finally {
@@ -242,6 +270,24 @@ export default function CaixaPage() {
           { key: "valor_abertura", label: "Saldo inicial", render: (s) => <span className="text-right block">R$ {s.valor_abertura?.toFixed(2)}</span> },
           { key: "valor_fechamento", label: "Saldo final", render: (s) => <span className="text-right block">{s.valor_fechamento != null ? "R$ " + s.valor_fechamento.toFixed(2) : "—"}</span> },
           { key: "status", label: "Status", render: (s) => (s.status === "aberta" ? <Badge variant="success">Aberto</Badge> : <Badge variant="default">Fechado</Badge>) },
+          ...(isAdmin ? [
+            {
+              key: "acoes",
+              label: "Ações",
+              render: (s: CashSession) => (
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditingSession(s)}
+                  >
+                    Editar
+                  </Button>
+                </div>
+              )
+            }
+          ] : [])
         ]}
         data={sessions}
         keyExtractor={(s) => s.id}
@@ -257,6 +303,13 @@ export default function CaixaPage() {
         cancelLabel="Cancelar"
         variant="danger"
         loading={action === "closing"}
+      />
+
+      <EditCashModal
+        open={editingSession !== null}
+        onClose={() => setEditingSession(null)}
+        session={editingSession}
+        onSave={reloadSessions}
       />
     </div>
   );

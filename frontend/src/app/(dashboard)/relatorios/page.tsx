@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
-import { Card, Table, Badge, Button, Skeleton } from "@/components/ui";
+import { Card, Table, Badge, Button, Skeleton, Segmented } from "@/components/ui";
 import { ReportFilters } from "@/components/reports/ReportFilters";
 import type {
   ReportSummary,
@@ -21,6 +21,44 @@ import { SalesByCategoryBarChart } from "@/components/reports/SalesByCategoryBar
 import { PaymentPieChart } from "@/components/reports/PaymentPieChart";
 import { SalesHeatmap } from "@/components/reports/SalesHeatmap";
 import { downloadReportExcel, printReport } from "@/components/reports/exportReport";
+import { VendasHistoricoTab } from "@/components/reports/VendasHistoricoTab";
+
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
+const SAZONALIDADE_MERCADO: Record<number, string> = {
+  1: "Pós-Natal, liquidação de fim de ano, férias; consumo tende a normalizar.",
+  2: "Volta às aulas, Carnaval, pré-páscoa; demanda por roupas e acessórios de festa.",
+  3: "Dia da Mulher, volta à rotina; campanhas promocionais no varejo.",
+  4: "Páscoa, dias mais frios no Sul/Sudeste; aquecimento em chocolates e vestuário.",
+  5: "Dia das Mães, um dos picos de vendas do primeiro semestre.",
+  6: "Festas Juninas, Dia dos Namorados; forte movimento em vestuário e presentes.",
+  7: "Férias escolares, liquidação de meio de ano; demanda variável por região.",
+  8: "Dia dos Pais, preparação para primavera; segundo pico do semestre.",
+  9: "Volta às aulas, Dia da Independência; recuperação de estoques.",
+  10: "Dia das Crianças, pré-Black Friday; aquecimento para fim de ano.",
+  11: "Black Friday e campanhas; um dos maiores meses de vendas do ano.",
+  12: "Natal e Réveillon; pico de consumo no varejo.",
+};
+
+const SAZONALIDADE_ROUPAS_FEMININAS: Record<number, string> = {
+  1: "Liquidação de verão; peças de festa pós-Réveillon; moda praia em promoção.",
+  2: "Carnaval: vestidos, looks festa, acessórios. Volta às aulas: uniforme e casual.",
+  3: "Dia da Mulher: pico em moda feminina, promoções e presentes. Entrada de outono.",
+  4: "Páscoa: looks leves, casacos leves no Sul. Transição outono/inverno.",
+  5: "Dia das Mães: um dos melhores meses; presentes, moda festa e casual.",
+  6: "Festas juninas: moda casual e térmica. Dia dos Namorados: vestidos e lingerie.",
+  7: "Liquidação de inverno. Férias: moda casual e conforto.",
+  8: "Dia dos Pais (presentes). Pré-primavera: novidades e cores.",
+  9: "Volta às aulas: moda jovem e casual. Dia da Independência; primavera.",
+  10: "Primavera/verão: vestidos, shorts, moda praia. Dia das Crianças (maternidade).",
+  11: "Black Friday: um dos picos do ano em moda feminina. Réveillon e festas.",
+  12: "Natal e Réveillon: vestidos de festa, moda noite; pico de vendas.",
+};
+
+type User = { id: number; username: string; name: string; role: string };
 
 type CashSessionRow = {
   id: number;
@@ -31,6 +69,7 @@ type CashSessionRow = {
   status: string;
 };
 type AccountRow = { id: number; fornecedor?: string; cliente?: string; descricao: string | null; data_vencimento: string; valor: number; status: string };
+type CommissionRow = { user_id: number | null; nome: string; comissao_percentual: number; total_vendido: number; vendas_count: number; comissao_total: number };
 
 const defaultFilters: ReportFiltersState = {
   preset: "30",
@@ -41,7 +80,10 @@ const defaultFilters: ReportFiltersState = {
 };
 
 export default function RelatoriosPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const userRole = user?.role ?? "";
+  const [activeTab, setActiveTab] = useState("indicadores");
+  const [vendedores, setVendedores] = useState<User[]>([]);
   const [mounted, setMounted] = useState(false);
   const [filters, setFilters] = useState<ReportFiltersState>(defaultFilters);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
@@ -54,9 +96,11 @@ export default function RelatoriosPage() {
   const [salesByCategory, setSalesByCategory] = useState<SalesByCategoryRow[]>([]);
   const [salesByPayment, setSalesByPayment] = useState<SalesByPaymentRow[]>([]);
   const [salesByHour, setSalesByHour] = useState<SalesByHourRow[]>([]);
+  const [commissions, setCommissions] = useState<CommissionRow[]>([]);
   const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedChart, setSelectedChart] = useState<"linha" | "categoria" | "pagamento" | "hora">("linha");
 
   const params = buildReportParams(filters);
   const summaryParams = filters.preset === "hoje" && filters.dataInicio
@@ -78,8 +122,9 @@ export default function RelatoriosPage() {
       apiFetch<SalesByCategoryRow[]>(`/reports/sales-by-category?${params}`).catch(() => []),
       apiFetch<SalesByPaymentRow[]>(`/reports/sales-by-payment?${params}`).catch(() => []),
       apiFetch<SalesByHourRow[]>(`/reports/sales-by-hour?${params}`).catch(() => []),
+      apiFetch<CommissionRow[]>(`/reports/commissions?${params}`).catch(() => []),
     ])
-      .then(([s, top, st, sess, pay, rec, byDay, byCat, byPay, byHour]) => {
+      .then(([s, top, st, sess, pay, rec, byDay, byCat, byPay, byHour, comm]) => {
         if (s != null) setSummary(s);
         setTopProducts(top || []);
         setStock(st || []);
@@ -90,6 +135,7 @@ export default function RelatoriosPage() {
         setSalesByCategory(byCat || []);
         setSalesByPayment(byPay || []);
         setSalesByHour(byHour || []);
+        setCommissions(comm || []);
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, summaryParams, params, filters.categoriaId]);
@@ -103,6 +149,9 @@ export default function RelatoriosPage() {
     apiFetch<{ id: number; nome: string }[]>("/categories/all")
       .then((list) => setCategories(list.map((c) => ({ value: String(c.id), label: c.nome }))))
       .catch(() => setCategories([]));
+    apiFetch<User[]>("/users")
+      .then(setVendedores)
+      .catch(() => setVendedores([]));
   }, [mounted, isAuthenticated]);
 
   useEffect(() => {
@@ -138,7 +187,50 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      <ReportFilters filters={filters} onChange={setFilters} categoryOptions={categories} />
+      {/* Abas */}
+      <div className="flex border-b border-rose-100 mb-6 print:hidden">
+        <button
+          type="button"
+          onClick={() => setActiveTab("indicadores")}
+          className={`py-2 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "indicadores"
+              ? "border-primary-700 text-primary-700"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Métricas & Indicadores
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("historico")}
+          className={`py-2 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "historico"
+              ? "border-primary-700 text-primary-700"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Histórico de Vendas
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("sazonalidade")}
+          className={`py-2 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "sazonalidade"
+              ? "border-primary-700 text-primary-700"
+              : "border-transparent text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Sazonalidades & Planejamento
+        </button>
+      </div>
+
+      {activeTab === "historico" ? (
+        <VendasHistoricoTab userRole={userRole} vendedores={vendedores} />
+      ) : activeTab === "sazonalidade" ? (
+        <SazonalidadesTab />
+      ) : (
+        <>
+          <ReportFilters filters={filters} onChange={setFilters} categoryOptions={categories} />
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
       {loading && (
@@ -202,21 +294,47 @@ export default function RelatoriosPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Gráficos</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card title="Vendas por dia">
-                <SalesLineChart data={salesByDay} />
-              </Card>
-              <Card title="Vendas por categoria">
-                <SalesByCategoryBarChart data={salesByCategory} />
-              </Card>
-              <Card title="Forma de pagamento">
-                <PaymentPieChart data={salesByPayment} />
-              </Card>
-              <Card title="Vendas por hora">
-                <SalesHeatmap data={salesByHour} />
-              </Card>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Gráficos de Desempenho</h2>
+            <Card>
+              <div className="mb-6 max-w-2xl mx-auto">
+                <Segmented
+                  options={[
+                    { value: "linha", label: "Evolução de Vendas" },
+                    { value: "categoria", label: "Categorias" },
+                    { value: "pagamento", label: "Formas de Pagamento" },
+                    { value: "hora", label: "Vendas por Hora" },
+                  ]}
+                  value={selectedChart}
+                  onChange={setSelectedChart}
+                />
+              </div>
+              <div className="min-h-[320px] flex items-center justify-center w-full">
+                {selectedChart === "linha" && (
+                  <div className="w-full h-80">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4 text-center">Vendas por Dia</h3>
+                    <SalesLineChart data={salesByDay} />
+                  </div>
+                )}
+                {selectedChart === "categoria" && (
+                  <div className="w-full h-80">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4 text-center">Vendas por Categoria</h3>
+                    <SalesByCategoryBarChart data={salesByCategory} />
+                  </div>
+                )}
+                {selectedChart === "pagamento" && (
+                  <div className="w-full h-80">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4 text-center">Formas de Pagamento</h3>
+                    <PaymentPieChart data={salesByPayment} />
+                  </div>
+                )}
+                {selectedChart === "hora" && (
+                  <div className="w-full h-80">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-4 text-center">Distribuição por Horário</h3>
+                    <SalesHeatmap data={salesByHour} />
+                  </div>
+                )}
+              </div>
+            </Card>
           </section>
 
           <section className="mb-8">
@@ -229,6 +347,21 @@ export default function RelatoriosPage() {
                 { key: "quantidade_vendida", label: "Qtd.", render: (r) => r.quantidade_vendida.toFixed(1) },
                 { key: "valor_total", label: "Valor total", render: (r) => `R$ ${r.valor_total.toFixed(2)}` },
                 { key: "lucro_total", label: "Lucro", render: (r) => `R$ ${r.lucro_total.toFixed(2)}` },
+              ]}
+            />
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Comissões por vendedor</h2>
+            <Table<CommissionRow>
+              keyExtractor={(r) => `c-${r.user_id ?? "none"}`}
+              data={commissions}
+              columns={[
+                { key: "nome", label: "Vendedor" },
+                { key: "vendas_count", label: "Vendas" },
+                { key: "total_vendido", label: "Total vendido", render: (r) => `R$ ${r.total_vendido.toFixed(2)}` },
+                { key: "comissao_percentual", label: "%", render: (r) => `${r.comissao_percentual}%` },
+                { key: "comissao_total", label: "Comissão", render: (r) => `R$ ${r.comissao_total.toFixed(2)}` },
               ]}
             />
           </section>
@@ -297,6 +430,69 @@ export default function RelatoriosPage() {
           </section>
         </>
       )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SazonalidadesTab() {
+  const currentMonth = new Date().getMonth() + 1; // 1-12
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="bg-gradient-to-r from-rose-50/50 to-amber-50/40 rounded-2xl border border-rose-100/40 p-5 shadow-xs">
+        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-2">
+          <span>📅</span> Calendário Anual de Sazonalidades (Planejamento)
+        </h2>
+        <p className="text-xs text-gray-500">
+          Consulte as tendências típicas de consumo do varejo geral brasileiro e o comportamento específico do mercado de moda feminina para cada mês do ano. Prepare seus estoques e campanhas com antecedência!
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {MONTH_NAMES.map((monthName, idx) => {
+          const monthNum = idx + 1;
+          const isCurrent = monthNum === currentMonth;
+
+          return (
+            <div
+              key={monthNum}
+              className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all duration-300 hover:shadow-md ${
+                isCurrent 
+                  ? "border-primary-500 ring-2 ring-primary-100/50 bg-rose-50/5" 
+                  : "border-gray-200/80"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <h3 className="text-base font-extrabold text-gray-900">{monthName}</h3>
+                  {isCurrent && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-primary-100 text-primary-800 uppercase tracking-wider animate-pulse">
+                      Mês Atual
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Mercado Geral</h4>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {SAZONALIDADE_MERCADO[monthNum]}
+                    </p>
+                  </div>
+                  <div className="border-t border-rose-100/30 pt-3">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-primary-500 mb-1">Moda Feminina</h4>
+                    <p className="text-xs text-gray-800 font-medium leading-relaxed">
+                      {SAZONALIDADE_ROUPAS_FEMININAS[monthNum]}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

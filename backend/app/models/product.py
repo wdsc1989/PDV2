@@ -11,6 +11,7 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String(50), unique=True, nullable=False, index=True)
+    codigo_barras = Column(String(50), nullable=True, index=True)  # EAN/GTIN p/ etiqueta e leitor
     nome = Column(String(200), nullable=False)
     categoria = Column(String(100), nullable=True)
     marca = Column(String(100), nullable=True)
@@ -19,6 +20,8 @@ class Product(Base):
     estoque_atual = Column(Float, nullable=False, default=0.0)
     estoque_minimo = Column(Float, nullable=True)
     imagem_path = Column(String(255), nullable=True)
+    no_catalogo = Column(Boolean, nullable=False, default=True)  # visível na vitrine pública
+    em_destaque = Column(Boolean, nullable=False, default=False)  # visível na seção de destaques
     ativo = Column(Boolean, nullable=False, default=True)
     categoria_id = Column(Integer, ForeignKey("product_categories.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -10,6 +10,7 @@ class AccountReceivableBase(BaseModel):
     data_recebimento: date | None = None
     valor: float = 0.0
     observacao: str | None = None
+    client_id: int | None = None
 
 
 class AccountReceivableCreate(AccountReceivableBase):
@@ -23,6 +24,7 @@ class AccountReceivableUpdate(BaseModel):
     data_recebimento: date | None = None
     valor: float | None = None
     observacao: str | None = None
+    client_id: int | None = None
 
 
 class AccountReceivableResponse(AccountReceivableBase):

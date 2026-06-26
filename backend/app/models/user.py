@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
 
 from app.core.database import Base
 
@@ -15,4 +15,6 @@ class User(Base):
     role = Column(String(20), nullable=False, default="vendedor")
     active = Column(Boolean, nullable=False, default=True)
     signo = Column(String(20), nullable=True)
+    # % de comissão padrão sobre o total vendido (todos os perfis; típico p/ vendedor).
+    comissao_percentual = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -39,6 +39,7 @@ def create_account_receivable(
         data_recebimento=body.data_recebimento,
         valor=body.valor,
         observacao=body.observacao,
+        client_id=body.client_id,
     )
     ar.update_status()
     db.add(ar)

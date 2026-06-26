@@ -15,6 +15,8 @@ from app.models.product_category import ProductCategory
 from app.models.account_payable import AccountPayable
 from app.models.account_receivable import AccountReceivable
 from app.models.stock_entry import StockEntry
+from app.models.catalog_lead import CatalogLead
+from app.models.look import Look
 from app.schemas.report import (
     ReportSummary,
     SalesByDayRow,
@@ -24,6 +26,10 @@ from app.schemas.report import (
     StockRow,
     SalesByHourRow,
     CostVariationRow,
+    CommissionRow,
+    AlertRow,
+    DetailedCommissionRow,
+    PayCommissionsBody,
 )
 
 router = APIRouter()
@@ -113,6 +119,12 @@ def report_summary(
         .scalar() or 0
     )
 
+    leads_pendentes = (
+        db.query(func.count(CatalogLead.id))
+        .filter(CatalogLead.contatado.is_(False))
+        .scalar() or 0
+    )
+
     # Vendedor não enxerga lucro nem custo de estoque (apenas admin/gerente).
     is_vendedor = user.role == "vendedor"
     return ReportSummary(
@@ -127,6 +139,7 @@ def report_summary(
         valor_estoque_custo=0.0 if is_vendedor else round(valor_estoque_custo, 2),
         valor_estoque_venda=round(valor_estoque_venda, 2),
         produtos_estoque_critico_count=int(estoque_critico),
+        leads_pendentes_count=int(leads_pendentes),
     )
 
 
@@ -332,6 +345,195 @@ def cost_variation(
     return rows
 
 
+@router.get("/commissions", response_model=list[CommissionRow])
+def commissions(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    days: Optional[int] = Query(30, ge=1, le=365),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
+):
+    """Comissão por vendedor no período (vendas concluídas, usando o snapshot da venda)."""
+    start, end = _parse_period(data_inicio, data_fim, days)
+    query = (
+        db.query(
+            Sale.user_id.label("user_id"),
+            func.coalesce(func.max(User.name), "—").label("nome"),
+            func.coalesce(func.max(Sale.comissao_percentual), 0).label("pct"),
+            func.coalesce(func.sum(Sale.total_vendido), 0).label("total"),
+            func.count(Sale.id).label("cnt"),
+            func.coalesce(func.sum(Sale.comissao_valor), 0).label("comissao"),
+        )
+        .outerjoin(User, User.id == Sale.user_id)
+        .filter(Sale.data_venda >= start, Sale.data_venda <= end, Sale.status == "concluida")
+    )
+    if user.role == "vendedor":
+        query = query.filter(Sale.user_id == user.id)
+    rows = query.group_by(Sale.user_id).order_by(func.sum(Sale.comissao_valor).desc()).all()
+    return [
+        CommissionRow(
+            user_id=r.user_id,
+            nome=r.nome if r.user_id is not None else "Sem vendedor",
+            comissao_percentual=round(float(r.pct), 2),
+            total_vendido=round(float(r.total), 2),
+            vendas_count=int(r.cnt),
+            comissao_total=round(float(r.comissao), 2),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/commissions/detailed", response_model=list[DetailedCommissionRow])
+def commissions_detailed(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+    user_id: Optional[int] = Query(None),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
+    status: Optional[str] = Query("todas"),
+):
+    """Histórico detalhado de comissões por venda."""
+    if user.role == "vendedor":
+        user_id = user.id
+
+    q = db.query(Sale).filter(Sale.status == "concluida")
+    if user_id is not None:
+        q = q.filter(Sale.user_id == user_id)
+    if data_inicio is not None:
+        q = q.filter(Sale.data_venda >= data_inicio)
+    if data_fim is not None:
+        q = q.filter(Sale.data_venda <= data_fim)
+
+    if status == "paga":
+        q = q.filter(Sale.comissao_paga.is_(True))
+    elif status == "pendente":
+        q = q.filter(Sale.comissao_paga.is_(False))
+
+    sales = q.order_by(Sale.data_venda.desc(), Sale.id.desc()).all()
+    vendedores = {u.id: u.name for u in db.query(User).all()}
+
+    return [
+        DetailedCommissionRow(
+            sale_id=s.id,
+            data_venda=s.data_venda,
+            subtotal_bruto=s.subtotal_bruto,
+            desconto_valor=s.desconto_valor,
+            total_vendido=s.total_vendido,
+            comissao_percentual=s.comissao_percentual,
+            comissao_valor=s.comissao_valor,
+            comissao_paga=s.comissao_paga,
+            vendedor_nome=vendedores.get(s.user_id, "Sem vendedor"),
+        )
+        for s in sales
+    ]
+
+
+@router.post("/commissions/pay", status_code=204)
+def pay_commissions(
+    body: PayCommissionsBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente"])),
+):
+    """Marca comissões de um lote de vendas como pagas."""
+    if not body.sale_ids:
+        return
+    db.query(Sale).filter(Sale.id.in_(body.sale_ids)).update(
+        {Sale.comissao_paga: True}, synchronize_session=False
+    )
+    db.commit()
+
+
+@router.get("/alerts", response_model=list[AlertRow])
+def alerts(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente", "vendedor"])),
+):
+    """Alertas operacionais: estoque abaixo do mínimo e produtos do catálogo sem foto."""
+    result: list[AlertRow] = []
+    baixos = (
+        db.query(Product)
+        .filter(
+            Product.ativo.is_(True),
+            Product.estoque_minimo.isnot(None),
+            Product.estoque_atual <= Product.estoque_minimo,
+        )
+        .order_by(Product.estoque_atual)
+        .all()
+    )
+    for p in baixos:
+        result.append(
+            AlertRow(
+                product_id=p.id,
+                nome=p.nome,
+                tipo="estoque_baixo",
+                estoque_atual=float(p.estoque_atual or 0),
+                estoque_minimo=p.estoque_minimo,
+            )
+        )
+    sem_foto = (
+        db.query(Product)
+        .filter(
+            Product.ativo.is_(True),
+            Product.no_catalogo.is_(True),
+            Product.imagem_path.is_(None),
+        )
+        .order_by(Product.nome)
+        .all()
+    )
+    for p in sem_foto:
+        result.append(
+            AlertRow(
+                product_id=p.id,
+                nome=p.nome,
+                tipo="sem_foto",
+                estoque_atual=float(p.estoque_atual or 0),
+                estoque_minimo=p.estoque_minimo,
+            )
+        )
+
+    # Leads do catálogo pendentes de contato
+    leads_pendentes = (
+        db.query(CatalogLead)
+        .filter(CatalogLead.contatado.is_(False))
+        .order_by(CatalogLead.created_at.desc())
+        .all()
+    )
+    
+    product_ids = {ld.product_id for ld in leads_pendentes if ld.product_id}
+    look_ids = {ld.look_id for ld in leads_pendentes if ld.look_id}
+    
+    products_map = {}
+    if product_ids:
+        products = db.query(Product).filter(Product.id.in_(product_ids)).all()
+        products_map = {p.id: p.nome for p in products}
+        
+    looks_map = {}
+    if look_ids:
+        looks = db.query(Look).filter(Look.id.in_(look_ids)).all()
+        looks_map = {lk.id: lk.nome for lk in looks}
+        
+    for ld in leads_pendentes:
+        nome_interesse = "Newsletter"
+        if ld.tipo == "produto" and ld.product_id:
+            nome_interesse = products_map.get(ld.product_id, "Produto")
+        elif ld.tipo == "look" and ld.look_id:
+            nome_interesse = looks_map.get(ld.look_id, "Look")
+            
+        cliente_nome = ld.nome if ld.nome else "Cliente"
+        
+        result.append(
+            AlertRow(
+                product_id=ld.product_id,
+                nome=f"Interesse de {cliente_nome} em {nome_interesse}",
+                tipo="lead_catalogo",
+                estoque_atual=None,
+                estoque_minimo=None
+            )
+        )
+
+    return result
+
+
 @router.get("/sales-by-hour", response_model=list[SalesByHourRow])
 def sales_by_hour(
     db: Session = Depends(get_db),
@@ -343,7 +545,10 @@ def sales_by_hour(
     start, end = _parse_period(data_inicio, data_fim, days)
     start_dt = dt.combine(start, dt.min.time())
     end_dt = dt.combine(end, dt.max.time())
-    hour_expr = func.cast(func.strftime("%H", Sale.created_at), Integer)
+    if "sqlite" in str(db.bind.url):
+        hour_expr = func.cast(func.strftime("%H", Sale.created_at), Integer)
+    else:
+        hour_expr = func.cast(func.extract("hour", Sale.created_at), Integer)
     rows = (
         db.query(
             hour_expr.label("hour"),

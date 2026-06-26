@@ -6,7 +6,7 @@ import { useAuthStore } from "@/store/auth";
 import { apiFetch } from "@/api/client";
 import { IconMenu, IconBell, IconUser, IconLogOut } from "./icons";
 
-type Summary = { produtos_estoque_critico_count: number; contas_vencidas_count: number };
+type Summary = { produtos_estoque_critico_count: number; contas_vencidas_count: number; leads_pendentes_count?: number };
 type CashSession = { data_abertura: string } | null;
 
 interface HeaderProps {
@@ -37,11 +37,12 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
 
   const alertStock = (summary?.produtos_estoque_critico_count ?? 0) > 0;
   const alertContas = (summary?.contas_vencidas_count ?? 0) > 0;
+  const alertLeads = (summary?.leads_pendentes_count ?? 0) > 0;
   const cashOpen = !!cashSession?.data_abertura;
   const cashHours = cashSession?.data_abertura
     ? Math.floor((Date.now() - new Date(cashSession.data_abertura).getTime()) / (1000 * 60 * 60))
     : 0;
-  const notifCount = [alertStock, alertContas, cashOpen].filter(Boolean).length;
+  const notifCount = [alertStock, alertContas, alertLeads, cashOpen].filter(Boolean).length;
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 px-4 sm:px-6 flex items-center justify-between shrink-0">
@@ -99,19 +100,32 @@ export function Header({ onMenuClick, onLogout }: HeaderProps) {
                       </Link>
                     </li>
                   )}
+                  {alertLeads && summary && (
+                    <li>
+                      <Link
+                        href="/clientes"
+                        onClick={() => setNotifOpen(false)}
+                        className="block px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 font-medium"
+                      >
+                        {summary.leads_pendentes_count} lead(s) pendente(s) no catálogo
+                      </Link>
+                    </li>
+                  )}
                   {cashOpen && (
                     <li>
                       <Link
                         href="/caixa"
                         onClick={() => setNotifOpen(false)}
-                        className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        className={`block px-3 py-2 text-sm hover:bg-gray-50 ${
+                          cashHours >= 24 ? "text-red-700 font-medium" : "text-gray-700"
+                        }`}
                       >
                         Caixa aberto há {cashHours}h
                       </Link>
                     </li>
                   )}
-                  {!alertStock && !alertContas && !cashOpen && (
-                    <li className="px-3 py-2 text-sm text-gray-500">Nenhuma notificação</li>
+                  {!alertStock && !alertContas && !alertLeads && !cashOpen && (
+                    <li className="px-3 py-2 text-sm text-gray-500">Sem notificações</li>
                   )}
                 </ul>
               )}

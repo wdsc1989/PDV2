@@ -15,6 +15,7 @@ class ReportSummary(BaseModel):
     valor_estoque_custo: float
     valor_estoque_venda: float
     produtos_estoque_critico_count: int
+    leads_pendentes_count: int = 0
 
 
 class SalesByDayRow(BaseModel):
@@ -67,3 +68,36 @@ class CostVariationRow(BaseModel):
     variacao_percentual: float
     custo_medio_atual: float
     entradas_count: int
+
+
+class CommissionRow(BaseModel):
+    user_id: int | None
+    nome: str
+    comissao_percentual: float
+    total_vendido: float
+    vendas_count: int
+    comissao_total: float
+
+
+class AlertRow(BaseModel):
+    product_id: int | None = None
+    nome: str
+    tipo: str  # "estoque_baixo" | "sem_foto" | "lead_catalogo"
+    estoque_atual: float | None = None
+    estoque_minimo: float | None = None
+
+
+class DetailedCommissionRow(BaseModel):
+    sale_id: int
+    data_venda: date
+    subtotal_bruto: float
+    desconto_valor: float
+    total_vendido: float
+    comissao_percentual: float
+    comissao_valor: float
+    comissao_paga: bool
+    vendedor_nome: str
+
+
+class PayCommissionsBody(BaseModel):
+    sale_ids: list[int]

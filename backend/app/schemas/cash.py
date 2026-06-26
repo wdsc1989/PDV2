@@ -24,3 +24,12 @@ class CashSessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CashSessionUpdate(BaseModel):
+    data_abertura: datetime | None = None
+    data_fechamento: datetime | None = None
+    valor_abertura: float | None = None
+    valor_fechamento: float | None = None
+    status: str | None = None
+    observacao: str | None = None

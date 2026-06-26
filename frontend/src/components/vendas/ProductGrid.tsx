@@ -6,6 +6,7 @@ import { Button, Badge } from "@/components/ui";
 export type ProductForGrid = {
   id: number;
   codigo: string;
+  codigo_barras?: string | null;
   nome: string;
   preco_venda: number;
   estoque_atual: number;
@@ -56,14 +57,14 @@ export function ProductGrid({ products, onAdd, loading }: ProductGridProps) {
           >
             <button
               type="button"
-              className="flex-1 flex flex-col text-left p-3 w-full min-h-[44px] touch-manipulation"
+              className="flex-1 flex flex-col text-left p-3 w-full min-h-[44px] touch-manipulation group"
               onClick={() => p.estoque_atual >= 1 && onAdd(p, 1)}
               disabled={p.estoque_atual < 1}
-              aria-label={`Adicionar ${p.nome} ao carrinho`}
+              aria-label={`Adicionar ${p.nome} à sacola`}
             >
               <div className="aspect-square bg-rose-50 rounded mb-2 flex items-center justify-center overflow-hidden">
                 {p.imagem_path ? (
-                  <img src={assetUrl(p.imagem_path) ?? undefined} alt={p.nome} width={120} height={120} loading="lazy" className="w-full h-full object-cover" />
+                  <img src={assetUrl(p.imagem_path) ?? undefined} alt={p.nome} width={120} height={120} loading="lazy" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-125 ease-out" />
                 ) : (
                   <PackageIcon />
                 )}

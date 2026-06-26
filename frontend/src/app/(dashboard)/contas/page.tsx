@@ -135,11 +135,6 @@ export default function ContasPage() {
       <PageHeader
         title="Contas"
         subtitle="Controle de contas a pagar e a receber"
-        actions={
-          <Button variant="secondary" onClick={() => router.push("/agente-contas")}>
-            Usar Agente de Contas
-          </Button>
-        }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

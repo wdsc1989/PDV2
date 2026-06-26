@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Rubik, Nunito_Sans } from "next/font/google";
+import { Rubik, Nunito_Sans, Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -11,6 +11,19 @@ const rubik = Rubik({
 const nunitoSans = Nunito_Sans({
   subsets: ["latin"],
   variable: "--font-nunito",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  variable: "--font-cormorant",
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-montserrat",
   weight: ["300", "400", "500", "600", "700"],
 });
 
@@ -26,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${rubik.variable} ${nunitoSans.variable} font-sans antialiased`}>
+      <body className={`${rubik.variable} ${nunitoSans.variable} ${cormorant.variable} ${montserrat.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

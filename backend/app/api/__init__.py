@@ -16,8 +16,10 @@ from app.api.endpoints import (
     reports,
     users,
     ai_config,
-    report_agent,
-    accounts_agent,
+    catalog,
+    looks,
+    settings,
+    clients,
 )
 
 api_router = APIRouter()
@@ -32,7 +34,10 @@ api_router.include_router(accounts_payable.router, prefix="/accounts-payable", t
 api_router.include_router(accounts_receivable.router, prefix="/accounts-receivable", tags=["accounts-receivable"])
 api_router.include_router(accessories.router, prefix="/accessories", tags=["accessories"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
+api_router.include_router(looks.router, prefix="/looks", tags=["looks"])
+api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(ai_config.router, prefix="/ai", tags=["ai"])
-api_router.include_router(report_agent.router, prefix="/ai/report-agent", tags=["ai-report-agent"])
-api_router.include_router(accounts_agent.router, prefix="/ai/accounts-agent", tags=["ai-accounts-agent"])
+api_router.include_router(clients.router, prefix="/clients", tags=["clients"])
+

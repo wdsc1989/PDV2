@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user, require_roles
 from app.models.user import User
 from app.models.cash_session import CashSession
-from app.schemas.cash import CashSessionClose, CashSessionOpen, CashSessionResponse
+from app.schemas.cash import CashSessionClose, CashSessionOpen, CashSessionResponse, CashSessionUpdate
 
 router = APIRouter()
 
@@ -65,6 +65,37 @@ def close_session(
     session.valor_fechamento = body.valor_fechamento
     session.observacao = body.observacao or session.observacao
     session.status = "fechada"
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+@router.patch("/sessions/{session_id}", response_model=CashSessionResponse)
+def update_cash_session(
+    session_id: int,
+    body: CashSessionUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin"])),
+):
+    session = db.query(CashSession).filter(CashSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Cash session not found")
+
+    if body.data_abertura is not None:
+        session.data_abertura = body.data_abertura
+    if body.data_fechamento is not None:
+        session.data_fechamento = body.data_fechamento
+    if body.valor_abertura is not None:
+        session.valor_abertura = body.valor_abertura
+    if body.valor_fechamento is not None:
+        session.valor_fechamento = body.valor_fechamento
+    if body.status is not None:
+        if body.status not in ["aberta", "fechada"]:
+            raise HTTPException(status_code=400, detail="Invalid status. Must be 'aberta' or 'fechada'")
+        session.status = body.status
+    if body.observacao is not None:
+        session.observacao = body.observacao
+
     db.commit()
     db.refresh(session)
     return session

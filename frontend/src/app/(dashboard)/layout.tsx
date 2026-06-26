@@ -6,7 +6,7 @@ import { useAuthStore } from "@/store/auth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 // Guard de rota: a sidebar esconde, mas URL digitada também precisa respeitar o papel.
-const VENDEDOR_PREFIXES = ["/vendas", "/caixa", "/recibo", "/sobre"];
+const VENDEDOR_PREFIXES = ["/vendas", "/caixa", "/recibo", "/sobre", "/comissoes"];
 const ADMIN_ONLY_PREFIXES = ["/admin"];
 
 function allowedPath(pathname: string, role: string | undefined): boolean {

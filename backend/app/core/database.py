@@ -16,6 +16,10 @@ if settings.DATABASE_URL.startswith("sqlite"):
     if "/" in settings.DATABASE_URL.rstrip("/").split("///")[-1]:
         path = settings.DATABASE_URL.split("///")[-1]
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+else:
+    # Parâmetros de timeout para PostgreSQL (evita travar o backend em rede oscilante)
+    connect_args["connect_timeout"] = 5
+    connect_args["options"] = "-c statement_timeout=10000"  # aborta queries com mais de 10s
 
 engine = create_engine(
     settings.DATABASE_URL,
@@ -24,6 +28,7 @@ engine = create_engine(
     pool_pre_ping=not settings.DATABASE_URL.startswith("sqlite"),
     pool_size=10 if not settings.DATABASE_URL.startswith("sqlite") else 5,
     max_overflow=20 if not settings.DATABASE_URL.startswith("sqlite") else 0,
+    pool_recycle=30 if not settings.DATABASE_URL.startswith("sqlite") else -1,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

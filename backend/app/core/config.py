@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     AI_FIXED_API_KEY: str | None = None
     AI_FIXED_CONFIG_ENABLED: bool = False
 
+    # fal.ai — gerador de "looks" a partir das fotos dos produtos.
+    FAL_KEY: str | None = None
+    FAL_MODEL: str = "fal-ai/nano-banana/edit"  # aceita prompt + image_urls (múltiplas referências)
+
     class Config:
         env_file = ".env"
         case_sensitive = True

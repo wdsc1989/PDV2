@@ -21,7 +21,7 @@ export default function SobrePage() {
       <Card title="Módulos" className="mb-6">
         <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
           <li><strong>Caixa:</strong> abertura e fechamento de sessão de caixa.</li>
-          <li><strong>Vendas:</strong> registro de vendas com carrinho e histórico.</li>
+          <li><strong>Vendas:</strong> registro de vendas com sacola e histórico.</li>
           <li><strong>Produtos:</strong> cadastro de produtos e entrada de estoque.</li>
           <li><strong>Estoque:</strong> visão de produtos e entradas com métricas.</li>
           <li><strong>Categorias:</strong> cadastro de categorias de produtos.</li>

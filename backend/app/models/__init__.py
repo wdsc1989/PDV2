@@ -8,6 +8,11 @@ from app.models.account_payable import AccountPayable
 from app.models.account_receivable import AccountReceivable
 from app.models.accessory import AccessoryStock, AccessorySale, AccessoryStockEntry
 from app.models.ai_config import AIConfig
+from app.models.look import Look
+from app.models.catalog_lead import CatalogLead
+from app.models.system_setting import SystemSetting
+from app.models.client_contact_history import ClientContactHistory
+from app.models.client import Client
 
 __all__ = [
     "User",
@@ -23,4 +28,9 @@ __all__ = [
     "AccessorySale",
     "AccessoryStockEntry",
     "AIConfig",
+    "Look",
+    "CatalogLead",
+    "SystemSetting",
+    "ClientContactHistory",
+    "Client",
 ]

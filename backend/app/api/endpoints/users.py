@@ -33,6 +33,7 @@ def create_user(
         role=body.role,
         active=True,
         signo=body.signo,
+        comissao_percentual=body.comissao_percentual or 0.0,
     )
     db.add(u)
     db.commit()
@@ -70,6 +71,8 @@ def update_user(
         u.active = body.active
     if body.signo is not None:
         u.signo = body.signo
+    if body.comissao_percentual is not None:
+        u.comissao_percentual = body.comissao_percentual
     if body.password is not None and body.password.strip():
         u.password_hash = get_password_hash(body.password)
     db.commit()
