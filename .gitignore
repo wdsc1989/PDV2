@@ -69,3 +69,6 @@ htmlcov/
 
 # Alembic
 # Keep alembic/versions/*.py
+
+# Permitir a pasta lib do frontend Next.js
+!frontend/src/lib/
