@@ -1,8 +1,8 @@
 // Chamar o backend diretamente para o header Authorization ser enviado (rewrites do Next não repassam).
 const API_BASE =
   typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000") + "/api/v1"
-    : "/api/v1";
+    ? "/api/v1"
+    : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000") + "/api/v1";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
