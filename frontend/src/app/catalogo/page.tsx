@@ -321,7 +321,7 @@ export default function CatalogoPublicoPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar roupas, marcas ou composições..."
+              placeholder="Buscar roupas ou composições..."
               className="w-full rounded-xl border border-rose-100/80 bg-rose-50/40 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all shadow-inner"
             />
             <svg className="absolute left-3.5 top-3 w-4 h-4 text-rose-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

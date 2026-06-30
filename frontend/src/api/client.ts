@@ -120,8 +120,8 @@ export function assetUrl(path: string | null | undefined): string | null {
   if (/^https?:/.test(path)) return path;
   const base =
     typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
-      : "";
+      ? ""
+      : (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000");
   return base + path;
 }
 
