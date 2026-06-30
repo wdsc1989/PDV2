@@ -115,10 +115,36 @@ export default function Home() {
     apiFetch<AlertRow[]>("/reports/alerts")
       .then(setAlerts)
       .catch(() => setAlerts([]));
-    apiFetch<Lead[]>("/catalog/leads")
+    apiFetch<Lead[]>("/catalog/leads?nao_atendidos_only=true")
       .then(setLeads)
       .catch(() => setLeads([]));
   }, [mounted, isAuthenticated]);
+
+  async function handleStartContact(lead: Lead) {
+    try {
+      await apiFetch("/catalog/leads/contact", {
+        method: "POST",
+        body: JSON.stringify({
+          whatsapp: lead.whatsapp,
+          mensagem: `Primeiro contato iniciado via Dashboard (WhatsApp) para o interesse no ${
+            lead.tipo === "look"
+              ? `Look: ${lead.look_nome ?? `#${lead.look_id}`}`
+              : lead.tipo === "produto"
+              ? `Produto: ${lead.product_nome ?? `#${lead.product_id}`}`
+              : "Lançamentos/Novidades"
+          }`,
+        }),
+      });
+      // Filtra localmente o lead com o mesmo telefone para sumir imediatamente
+      setLeads((prev) => prev.filter((l) => l.whatsapp !== lead.whatsapp));
+    } catch (err) {
+      console.error("Erro ao marcar lead como contatado:", err);
+    }
+    
+    // Abre o WhatsApp na nova aba
+    const url = formatWhatsappLink(lead.whatsapp, lead.nome || "", lead.tipo === "look" ? lead.look_nome : lead.product_nome, lead.tipo);
+    window.open(url, "_blank");
+  }
 
   if (!mounted) {
     return (
@@ -300,17 +326,16 @@ export default function Home() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-rose-100/30 flex items-center justify-between">
-                  <a
-                    href={formatWhatsappLink(l.whatsapp, l.nome || "", l.tipo === "look" ? l.look_nome : l.product_nome, l.tipo)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 hover:bg-emerald-100/80 px-3 py-1.5 rounded-xl border border-emerald-100/50 transition-all active:scale-95 shadow-sm group"
+                  <button
+                    type="button"
+                    onClick={() => handleStartContact(l)}
+                    className="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 hover:bg-emerald-100/80 px-3 py-1.5 rounded-xl border border-emerald-100/50 transition-all active:scale-95 shadow-sm group cursor-pointer"
                   >
                     <svg className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97C16.59 1.966 14.12 .943 11.998.943c-5.442 0-9.867 4.371-9.87 9.8.001 1.73.473 3.41 1.37 4.912l-.997 3.634 3.75-.973zm12.18-5.926c-.328-.163-1.942-.945-2.242-1.054-.3-.109-.519-.163-.737.163-.218.327-.843 1.054-1.033 1.27-.19.218-.382.245-.71.082-.328-.163-1.385-.503-2.637-1.606-.975-.86-1.632-1.923-1.823-2.25-.19-.327-.02-.504.144-.666.148-.146.328-.382.492-.573.164-.19.219-.327.328-.545.109-.218.055-.409-.027-.573-.082-.164-.737-1.745-1.01-2.4-.266-.641-.532-.553-.732-.563-.19-.01-.409-.01-.628-.01-.218 0-.573.082-.873.409-.3.327-1.147 1.118-1.147 2.727 0 1.609 1.182 3.163 1.346 3.381.164.218 2.325 3.51 5.632 4.912.785.33 1.4.528 1.88.681.79.248 1.5.213 2.065.13.63-.092 1.942-.785 2.215-1.545.273-.76.273-1.409.19-1.545-.082-.136-.3-.218-.628-.382z" />
                     </svg>
                     WhatsApp
-                  </a>
+                  </button>
                   <span className="text-[10px] text-gray-500 font-medium">{l.whatsapp}</span>
                 </div>
               </div>

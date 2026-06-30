@@ -93,11 +93,15 @@ def create_lead(body: CatalogLeadCreate, db: Session = Depends(get_db)):
 
 @router.get("/leads", response_model=list[CatalogLeadResponse])
 def list_leads(
+    nao_atendidos_only: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(["admin", "gerente"]))
 ):
     """Lista todos os leads capturados, resolvendo nomes de produtos e looks. Apenas admin/gerente."""
-    leads = db.query(CatalogLead).order_by(CatalogLead.created_at.desc()).all()
+    query = db.query(CatalogLead)
+    if nao_atendidos_only:
+        query = query.filter(CatalogLead.contatado == False)
+    leads = query.order_by(CatalogLead.created_at.desc()).all()
     
     product_ids = {l.product_id for l in leads if l.product_id}
     look_ids = {l.look_id for l in leads if l.look_id}
