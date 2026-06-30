@@ -79,6 +79,14 @@ export default function ProdutosPage() {
   const [stockCusto, setStockCusto] = useState("");
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
+
+  // Ajuste de Estoque
+  const [adjProduct, setAdjProduct] = useState<Product | null>(null);
+  const [adjNewQty, setAdjNewQty] = useState("");
+  const [adjMotivo, setAdjMotivo] = useState("inventario");
+  const [adjObs, setAdjObs] = useState("");
+  const [adjSaving, setAdjSaving] = useState(false);
+  const [adjError, setAdjError] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<{ id: number; nome: string }[]>([]);
@@ -293,6 +301,40 @@ export default function ProdutosPage() {
       toast.error(err instanceof Error ? err.message : "Erro ao registrar entrada");
     } finally {
       setStockSaving(false);
+    }
+  }
+
+  async function handleAjusteEstoque(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adjProduct) return;
+    const qty = parseFloat(adjNewQty.replace(",", "."));
+    if (isNaN(qty) || qty < 0) {
+      setAdjError("Quantidade inválida.");
+      return;
+    }
+    setAdjError("");
+    setAdjSaving(true);
+    try {
+      await apiFetch("/stock/adjustments", {
+        method: "POST",
+        body: JSON.stringify({
+          product_id: adjProduct.id,
+          quantidade_nova: qty,
+          motivo: adjMotivo,
+          observacao: adjObs.trim() || null,
+        }),
+      });
+      toast.success("Estoque ajustado com sucesso.");
+      setAdjNewQty("");
+      setAdjMotivo("inventario");
+      setAdjObs("");
+      setAdjProduct(null);
+      loadProducts();
+    } catch (err) {
+      setAdjError(err instanceof Error ? err.message : "Erro ao ajustar estoque");
+      toast.error(err instanceof Error ? err.message : "Erro ao ajustar estoque");
+    } finally {
+      setAdjSaving(false);
     }
   }
 
@@ -758,6 +800,7 @@ export default function ProdutosPage() {
                 <div className="flex flex-wrap gap-1">
                   <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(r)}>Editar</Button>
                   <Button type="button" size="sm" variant="secondary" onClick={() => setStockProduct(r)}>Entrada</Button>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => { setAdjProduct(r); setAdjNewQty(String(r.estoque_atual)); setAdjError(""); }}>Ajuste</Button>
                   <Button type="button" size="sm" variant="secondary" onClick={() => setLabelProduct(r)}>Etiqueta</Button>
                   <Button type="button" size="sm" variant="danger" onClick={() => setDeleteConfirm(r.id)}>Excluir</Button>
                 </div>
@@ -791,6 +834,7 @@ export default function ProdutosPage() {
                 <div className="flex flex-col gap-1 shrink-0">
                   <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(p)}>Editar</Button>
                   <Button type="button" size="sm" variant="secondary" onClick={() => setStockProduct(p)}>Entrada</Button>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => { setAdjProduct(p); setAdjNewQty(String(p.estoque_atual)); setAdjError(""); }}>Ajuste</Button>
                   <Button type="button" size="sm" variant="secondary" onClick={() => setLabelProduct(p)}>Etiqueta</Button>
                   <Button type="button" size="sm" variant="danger" onClick={() => setDeleteConfirm(p.id)}>Excluir</Button>
                 </div>
@@ -809,6 +853,103 @@ export default function ProdutosPage() {
         confirmLabel="Excluir"
         variant="danger"
       />
+
+      {adjProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAdjProduct(null)} />
+          <div className="relative bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 border border-rose-100/50">
+            <button
+              onClick={() => setAdjProduct(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-all"
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="mb-4">
+              <span className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100/50">
+                Ajustar estoque (Auditoria)
+              </span>
+              <h3 className="mt-2 font-bold text-base text-gray-900 leading-snug">
+                Ajuste Manual de Estoque
+              </h3>
+            </div>
+
+            {/* Informações do Produto */}
+            <div className="flex gap-3 p-3 rounded-xl bg-rose-50/20 border border-rose-100/30 mb-4">
+              <div className="w-12 h-12 rounded-lg bg-rose-50 overflow-hidden shrink-0 flex items-center justify-center">
+                {adjProduct.imagem_path ? (
+                  <img src={assetUrl(adjProduct.imagem_path) ?? undefined} alt={adjProduct.nome} className="w-full h-full object-cover" />
+                ) : (
+                  <ProductPlaceholderIcon className="w-6 h-6" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-gray-800 truncate">{adjProduct.nome}</p>
+                <p className="text-[10px] text-gray-400 font-medium">Cód: {adjProduct.codigo}</p>
+                <div className="flex items-center gap-4 mt-1">
+                  <span className="text-[10px] font-semibold text-gray-500">Atual: <strong className="text-gray-700">{adjProduct.estoque_atual}</strong></span>
+                  <span className="text-[10px] font-semibold text-gray-500">Preço: <strong className="text-gray-700">R$ {adjProduct.preco_venda.toFixed(2)}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleAjusteEstoque} className="space-y-4">
+              {adjError && <p className="text-red-600 text-sm">{adjError}</p>}
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="adj-qty">Novo Estoque Absoluto *</Label>
+                  <Input
+                    id="adj-qty"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={adjNewQty}
+                    onChange={(e) => setAdjNewQty(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="adj-motivo">Motivo do Ajuste *</Label>
+                  <select
+                    id="adj-motivo"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                    value={adjMotivo}
+                    onChange={(e) => setAdjMotivo(e.target.value)}
+                  >
+                    <option value="inventario">Inventário (Correção)</option>
+                    <option value="perda_avaria">Perda / Avaria</option>
+                    <option value="brinde_consumo">Brinde / Consumo</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="adj-obs">Observação / Justificativa</Label>
+                <Input
+                  id="adj-obs"
+                  value={adjObs}
+                  onChange={(e) => setAdjObs(e.target.value)}
+                  placeholder="Justificativa do ajuste manual"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setAdjProduct(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" loading={adjSaving}>
+                  Confirmar Ajuste
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <BarcodeLabelModal product={labelProduct} onClose={() => setLabelProduct(null)} />
       </>

@@ -276,14 +276,9 @@ export function EstoqueTab() {
         title="Estoque"
         subtitle="Visão por produto e por categoria"
         actions={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={openAdjModal}>
-              Ajustar Estoque
-            </Button>
-            <Button variant="primary" onClick={openEntryModal}>
-              + Nova entrada
-            </Button>
-          </div>
+          <Button variant="primary" onClick={openEntryModal}>
+            + Nova entrada
+          </Button>
         }
       />
 
