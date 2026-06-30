@@ -20,6 +20,20 @@ type Product = {
 };
 type StockEntry = { id: number; product_id: number; quantity: number; preco_custo_unitario: number | null; data_entrada: string; observacao: string | null };
 
+type StockAdjustment = {
+  id: number;
+  product_id: number;
+  user_id: number;
+  quantidade_anterior: number;
+  quantidade_nova: number;
+  diferenca: number;
+  motivo: string;
+  observacao: string | null;
+  created_at: string;
+  product?: { id: number; nome: string };
+  user?: { id: number; username: string; name: string };
+};
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export function EstoqueTab() {
@@ -41,9 +55,22 @@ export function EstoqueTab() {
   const [entryObs, setEntryObs] = useState("");
   const [entryErrors, setEntryErrors] = useState<{ produto?: string; qty?: string; custo?: string }>({});
 
+  // Ajuste de Estoque
+  const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
+  const [adjModalOpen, setAdjModalOpen] = useState(false);
+  const [adjSaving, setAdjSaving] = useState(false);
+  const [adjSearch, setAdjSearch] = useState("");
+  const [adjProduct, setAdjProduct] = useState<Product | null>(null);
+  const [adjNewQty, setAdjNewQty] = useState("");
+  const [adjMotivo, setAdjMotivo] = useState("inventario");
+  const [adjObs, setAdjObs] = useState("");
+  const [adjErrors, setAdjErrors] = useState<{ produto?: string; qty?: string }>({});
+  const [showAdjustments, setShowAdjustments] = useState(false);
+
   const loadAll = () => {
     apiFetch<Product[]>("/products?active_only=false").then(setProducts).catch(() => setProducts([]));
     apiFetch<StockEntry[]>("/stock/entries?limit=100").then(setEntries).catch(() => setEntries([]));
+    apiFetch<StockAdjustment[]>("/stock/adjustments?limit=100").then(setAdjustments).catch(() => setAdjustments([]));
     apiFetch<{ id: number; nome: string }[]>("/categories/all").then(setCategories).catch(() => setCategories([]));
   };
 
@@ -115,6 +142,59 @@ export function EstoqueTab() {
       toast.error(err instanceof Error ? err.message : "Erro ao registrar entrada.");
     } finally {
       setEntrySaving(false);
+    }
+  }
+
+  function openAdjModal() {
+    setAdjProduct(null);
+    setAdjSearch("");
+    setAdjNewQty("");
+    setAdjMotivo("inventario");
+    setAdjObs("");
+    setAdjErrors({});
+    setAdjModalOpen(true);
+  }
+
+  function pickAdjProduct(p: Product) {
+    setAdjProduct(p);
+    setAdjSearch(p.nome);
+    setAdjNewQty(String(p.estoque_atual));
+    setAdjErrors((e) => ({ ...e, produto: undefined }));
+  }
+
+  const adjMatches = useMemo(() => {
+    const term = adjSearch.trim().toLowerCase();
+    if (!term || (adjProduct && adjProduct.nome === adjSearch)) return [];
+    return products
+      .filter((p) => p.nome.toLowerCase().includes(term) || p.codigo.toLowerCase().includes(term))
+      .slice(0, 8);
+  }, [adjSearch, products, adjProduct]);
+
+  async function submitAdjustment() {
+    const errs: { produto?: string; qty?: string } = {};
+    const qty = parseFloat(adjNewQty.replace(",", "."));
+    if (!adjProduct) errs.produto = "Escolha um produto da lista.";
+    if (isNaN(qty) || qty < 0) errs.qty = "Quantidade de estoque inválida.";
+    setAdjErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setAdjSaving(true);
+    try {
+      await apiFetch("/stock/adjustments", {
+        method: "POST",
+        body: JSON.stringify({
+          product_id: adjProduct!.id,
+          quantidade_nova: qty,
+          motivo: adjMotivo,
+          observacao: adjObs.trim() || null,
+        }),
+      });
+      toast.success("Estoque ajustado com sucesso.");
+      setAdjModalOpen(false);
+      loadAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao ajustar estoque.");
+    } finally {
+      setAdjSaving(false);
     }
   }
 
@@ -196,9 +276,14 @@ export function EstoqueTab() {
         title="Estoque"
         subtitle="Visão por produto e por categoria"
         actions={
-          <Button variant="primary" onClick={openEntryModal}>
-            + Nova entrada
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={openAdjModal}>
+              Ajustar Estoque
+            </Button>
+            <Button variant="primary" onClick={openEntryModal}>
+              + Nova entrada
+            </Button>
+          </div>
         }
       />
 
@@ -306,8 +391,29 @@ export function EstoqueTab() {
         />
       </div>
 
-      <h2 className="text-lg font-semibold text-gray-900 mb-2">Últimas entradas de estoque</h2>
-      <Table<StockEntry>
+      <div className="flex border-b border-gray-200 mb-4 mt-6">
+        <button
+          type="button"
+          className={`py-2 px-4 border-b-2 font-medium text-sm cursor-pointer ${
+            !showAdjustments ? "border-rose-500 text-rose-600" : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setShowAdjustments(false)}
+        >
+          Últimas entradas de estoque
+        </button>
+        <button
+          type="button"
+          className={`py-2 px-4 border-b-2 font-medium text-sm cursor-pointer ${
+            showAdjustments ? "border-rose-500 text-rose-600" : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setShowAdjustments(true)}
+        >
+          Histórico de Ajustes (Auditoria)
+        </button>
+      </div>
+
+      {!showAdjustments ? (
+        <Table<StockEntry>
         columns={[
           {
             key: "product_id",
@@ -330,6 +436,63 @@ export function EstoqueTab() {
         data={entries.slice(0, 50)}
         keyExtractor={(r) => r.id}
       />
+      ) : (
+        <Table<StockAdjustment>
+          columns={[
+            {
+              key: "product_id",
+              label: "Produto",
+              render: (r) => r.product?.nome ?? products.find((p) => p.id === r.product_id)?.nome ?? `#${r.product_id}`,
+            },
+            {
+              key: "quantidade_anterior",
+              label: "Qtd Anterior",
+              render: (r) => <span className="text-right block tabular-nums">{r.quantidade_anterior}</span>,
+            },
+            {
+              key: "quantidade_nova",
+              label: "Nova Qtd",
+              render: (r) => <span className="text-right block tabular-nums">{r.quantidade_nova}</span>,
+            },
+            {
+              key: "diferenca",
+              label: "Ajuste",
+              render: (r) => {
+                const diff = r.diferenca;
+                const color = diff > 0 ? "text-emerald-600 font-semibold" : diff < 0 ? "text-rose-600 font-semibold" : "text-gray-500";
+                const sign = diff > 0 ? "+" : "";
+                return <span className={`text-right block tabular-nums ${color}`}>{sign}{diff}</span>;
+              },
+            },
+            {
+              key: "motivo",
+              label: "Motivo",
+              render: (r) => {
+                const labels: Record<string, string> = {
+                  inventario: "Inventário",
+                  perda_avaria: "Perda/Avaria",
+                  brinde_consumo: "Brinde/Consumo",
+                  outros: "Outros",
+                };
+                return labels[r.motivo] ?? r.motivo;
+              },
+            },
+            {
+              key: "user_id",
+              label: "Operador",
+              render: (r) => r.user?.username ?? r.user?.name ?? `#${r.user_id}`,
+            },
+            {
+              key: "created_at",
+              label: "Data/Hora",
+              render: (r) => new Date(r.created_at).toLocaleString("pt-BR"),
+            },
+            { key: "observacao", label: "Obs", render: (r) => r.observacao ?? "—" },
+          ]}
+          data={adjustments.slice(0, 50)}
+          keyExtractor={(r) => r.id}
+        />
+      )}
 
       <Modal open={entryModalOpen} onClose={() => setEntryModalOpen(false)} title="Nova entrada de estoque">
         <div className="space-y-3">
@@ -422,6 +585,92 @@ export function EstoqueTab() {
             </Button>
             <Button type="button" onClick={submitEntry} loading={entrySaving}>
               Registrar entrada
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={adjModalOpen} onClose={() => setAdjModalOpen(false)} title="Ajustar estoque (Auditoria)">
+        <div className="space-y-3">
+          <div className="relative">
+            <Label htmlFor="adj-produto">Produto *</Label>
+            <Input
+              id="adj-produto"
+              autoFocus
+              placeholder="Digite nome ou código..."
+              value={adjSearch}
+              aria-invalid={adjErrors.produto ? true : undefined}
+              className={adjErrors.produto ? "border-red-500" : ""}
+              onChange={(e) => {
+                setAdjSearch(e.target.value);
+                setAdjProduct(null);
+              }}
+            />
+            {adjErrors.produto && <p role="alert" className="mt-1 text-xs text-red-600">{adjErrors.produto}</p>}
+            {adjMatches.length > 0 && (
+              <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-auto">
+                {adjMatches.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="w-full min-h-[44px] cursor-pointer text-left px-3 py-2 text-sm hover:bg-rose-50 flex justify-between items-center"
+                      onClick={() => pickAdjProduct(p)}
+                    >
+                      <span className="truncate">{p.nome}</span>
+                      <span className="ml-2 shrink-0 text-xs text-gray-500">est: {p.estoque_atual}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {adjProduct && (
+            <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 text-sm grid grid-cols-2 gap-2 text-gray-600">
+              <div>Estoque Atual: <strong className="text-gray-900">{adjProduct.estoque_atual}</strong></div>
+              <div>Preço Venda: <strong className="text-gray-900">R$ {adjProduct.preco_venda.toFixed(2)}</strong></div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="adj-qty">Novo estoque absoluto *</Label>
+              <Input
+                id="adj-qty"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="1"
+                value={adjNewQty}
+                aria-invalid={adjErrors.qty ? true : undefined}
+                className={adjErrors.qty ? "border-red-500" : ""}
+                onChange={(e) => setAdjNewQty(e.target.value)}
+              />
+              {adjErrors.qty && <p role="alert" className="mt-1 text-xs text-red-600">{adjErrors.qty}</p>}
+            </div>
+            <div>
+              <Label htmlFor="adj-motivo">Motivo do Ajuste *</Label>
+              <select
+                id="adj-motivo"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                value={adjMotivo}
+                onChange={(e) => setAdjMotivo(e.target.value)}
+              >
+                <option value="inventario">Inventário (Correção)</option>
+                <option value="perda_avaria">Perda / Avaria</option>
+                <option value="brinde_consumo">Brinde / Consumo</option>
+                <option value="outros">Outros</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="adj-obs">Observação / Justificativa</Label>
+            <Input id="adj-obs" value={adjObs} onChange={(e) => setAdjObs(e.target.value)} placeholder="Justificativa do ajuste manual" />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="secondary" onClick={() => setAdjModalOpen(false)} disabled={adjSaving}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={submitAdjustment} loading={adjSaving}>
+              Ajustar estoque
             </Button>
           </div>
         </div>

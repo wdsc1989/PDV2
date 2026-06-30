@@ -6,7 +6,13 @@ from app.core.deps import get_current_user, require_roles
 from app.models.user import User
 from app.models.product import Product
 from app.models.stock_entry import StockEntry
-from app.schemas.stock import StockEntryCreate, StockEntryResponse
+from app.models.stock_adjustment import StockAdjustment
+from app.schemas.stock import (
+    StockEntryCreate,
+    StockEntryResponse,
+    StockAdjustmentCreate,
+    StockAdjustmentResponse,
+)
 
 router = APIRouter()
 
@@ -60,3 +66,49 @@ def list_stock_entries(
     if product_id is not None:
         q = q.filter(StockEntry.product_id == product_id)
     return q.order_by(StockEntry.data_entrada.desc()).offset(skip).limit(limit).all()
+
+
+@router.post("/adjustments", response_model=StockAdjustmentResponse, status_code=status.HTTP_201_CREATED)
+def create_stock_adjustment(
+    body: StockAdjustmentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(["admin", "gerente"])),
+):
+    product = db.query(Product).filter(Product.id == body.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    
+    quantidade_anterior = product.estoque_atual or 0.0
+    diferenca = body.quantidade_nova - quantidade_anterior
+    
+    adjustment = StockAdjustment(
+        product_id=body.product_id,
+        user_id=user.id,
+        quantidade_anterior=quantidade_anterior,
+        quantidade_nova=body.quantidade_nova,
+        diferenca=diferenca,
+        motivo=body.motivo,
+        observacao=body.observacao,
+    )
+    db.add(adjustment)
+    product.estoque_atual = body.quantidade_nova
+    db.commit()
+    db.refresh(adjustment)
+    return adjustment
+
+
+@router.get("/adjustments", response_model=list[StockAdjustmentResponse])
+def list_stock_adjustments(
+    product_id: int | None = None,
+    motivo: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+):
+    q = db.query(StockAdjustment)
+    if product_id is not None:
+        q = q.filter(StockAdjustment.product_id == product_id)
+    if motivo is not None:
+        q = q.filter(StockAdjustment.motivo == motivo)
+    return q.order_by(StockAdjustment.created_at.desc()).offset(skip).limit(limit).all()
