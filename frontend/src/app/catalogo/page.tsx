@@ -20,6 +20,9 @@ type LookPiece = {
   papel: string;
   preco_venda: number;
   imagem_path: string | null;
+  em_destaque?: boolean;
+  categoria?: string | null;
+  marca?: string | null;
 };
 
 type CatalogLook = {
@@ -63,6 +66,7 @@ export default function CatalogoPublicoPage() {
   const [selectedBrand, setSelectedBrand] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [onlyPromo, setOnlyPromo] = useState(false);
   const [sortBy, setSortBy] = useState<"relevancia" | "preco_asc" | "preco_desc" | "novidades">("relevancia");
 
   // Detalhes selecionados (Modais)
@@ -180,16 +184,53 @@ export default function CatalogoPublicoPage() {
     return result;
   }, [products, search, selectedCategory, selectedBrand, minPrice, maxPrice, sortBy]);
 
-  // Filtragem de looks
+  // Filtragem de looks (Composições IA) por busca e filtros de categoria, marca, preço e promoção
   const filteredLooks = useMemo(() => {
-    if (!search.trim()) return looks;
-    const q = search.trim().toLowerCase();
-    return looks.filter(
-      (l) =>
-        l.nome.toLowerCase().includes(q) ||
-        (l.pieces ?? []).some((p) => p.nome.toLowerCase().includes(q))
-    );
-  }, [looks, search]);
+    let result = [...looks];
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(
+        (l) =>
+          l.nome.toLowerCase().includes(q) ||
+          (l.pieces ?? []).some((p) => p.nome.toLowerCase().includes(q))
+      );
+    }
+
+    if (selectedCategory) {
+      result = result.filter((l) =>
+        (l.pieces ?? []).some((p) => p.categoria === selectedCategory)
+      );
+    }
+
+    if (selectedBrand) {
+      result = result.filter((l) =>
+        (l.pieces ?? []).some((p) => p.marca === selectedBrand)
+      );
+    }
+
+    if (minPrice) {
+      const min = parseFloat(minPrice);
+      if (!isNaN(min)) {
+        result = result.filter((l) => (l.valor_total ?? 0) >= min);
+      }
+    }
+
+    if (maxPrice) {
+      const max = parseFloat(maxPrice);
+      if (!isNaN(max)) {
+        result = result.filter((l) => (l.valor_total ?? 0) <= max);
+      }
+    }
+
+    if (onlyPromo) {
+      result = result.filter((l) =>
+        (l.pieces ?? []).some((p) => p.em_destaque === true)
+      );
+    }
+
+    return result;
+  }, [looks, search, selectedCategory, selectedBrand, minPrice, maxPrice, onlyPromo]);
 
   function copyLink() {
     if (typeof window === "undefined") return;
@@ -279,19 +320,13 @@ export default function CatalogoPublicoPage() {
               <img
                 src={assetUrl(settings.logo_path) ?? undefined}
                 alt={settings.store_name}
-                className="w-12 h-12 object-contain bg-white rounded-xl shadow-md p-1 border border-rose-100"
+                className="h-14 w-auto object-contain bg-white rounded-xl shadow-md p-1 border border-rose-100"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-400 to-rose-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-rose-300">
                 V
               </div>
             )}
-            <div>
-              <h1 className="font-heading text-lg font-black text-gray-900 tracking-tight leading-none">
-                {settings?.store_name || "Vieira Closet Boutique"}
-              </h1>
-              <p className="text-[9px] uppercase font-bold tracking-wider text-rose-500 mt-1">Coleções & Estilo</p>
-            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -422,21 +457,21 @@ export default function CatalogoPublicoPage() {
 
             {/* Layout Principal de Colunas */}
             <div className="flex flex-col lg:flex-row gap-8">
-              {/* Coluna da Esquerda: Filtros (Apenas para produtos) */}
-              {activeTab === "produtos" && (
+              {/* Coluna da Esquerda: Filtros */}
+              {true && (
                 <aside className="w-full lg:w-64 shrink-0">
                   {/* Botão Mobile para exibir filtros */}
                   <div className="lg:hidden mb-4">
                     <button
                       onClick={() => setShowFilters(!showFilters)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-rose-100 bg-white text-sm font-semibold text-gray-700 hover:bg-rose-50/50 transition-all"
+                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-rose-100 bg-white text-sm font-semibold text-gray-700 hover:bg-rose-50/50 transition-all cursor-pointer"
                     >
                       <span className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
                         </svg>
                         Filtros
-                        {(selectedCategory || selectedBrand || minPrice || maxPrice) && (
+                        {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo) && (
                           <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block animate-pulse"></span>
                         )}
                       </span>
@@ -449,16 +484,17 @@ export default function CatalogoPublicoPage() {
                   {/* Filtros Container */}
                   <div className={`space-y-6 lg:block ${showFilters ? 'block' : 'hidden'} bg-white rounded-2xl border border-rose-100/50 p-5 shadow-sm`}>
                     <div className="flex items-center justify-between pb-3 border-b border-rose-100/40">
-                      <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wider">Filtrar Produtos</h3>
-                      {(selectedCategory || minPrice || maxPrice) && (
+                      <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wider">Filtrar Composições</h3>
+                      {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo) && (
                         <button
                           onClick={() => {
                             setSelectedCategory("");
                             setSelectedBrand("");
                             setMinPrice("");
                             setMaxPrice("");
+                            setOnlyPromo(false);
                           }}
-                          className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors uppercase"
+                          className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors uppercase cursor-pointer"
                         >
                           Limpar
                         </button>
@@ -524,6 +560,19 @@ export default function CatalogoPublicoPage() {
                           />
                         </div>
                       </div>
+                    </div>
+
+                    {/* Destaque / Promoção */}
+                    <div className="space-y-2 pt-4 border-t border-rose-100/30">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={onlyPromo}
+                          onChange={(e) => setOnlyPromo(e.target.checked)}
+                          className="rounded border-rose-200 text-rose-600 focus:ring-rose-400 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-gray-700">🔥 Apenas Promoções</span>
+                      </label>
                     </div>
                   </div>
                 </aside>
@@ -628,10 +677,15 @@ export default function CatalogoPublicoPage() {
                                 loading="lazy"
                                 className="h-full w-full object-cover group-hover:scale-120 transition-transform duration-300 ease-out"
                               />
-                              <div className="absolute top-3 right-3">
+                              <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-rose-600 text-white shadow-md">
                                   Composição IA
                                 </span>
+                                {(l.pieces ?? []).some((piece) => piece.em_destaque === true) && (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-md flex items-center gap-0.5 animate-pulse">
+                                    🔥 Promoção
+                                  </span>
+                                )}
                               </div>
 
                               {/* Peças sobrepostas do Look */}
@@ -650,11 +704,11 @@ export default function CatalogoPublicoPage() {
                                           setSelectedProduct({
                                             id: piece.id,
                                             nome: piece.nome,
-                                            categoria: null,
-                                            marca: null,
+                                            categoria: piece.categoria ?? null,
+                                            marca: piece.marca ?? null,
                                             preco_venda: piece.preco_venda,
                                             imagem_path: piece.imagem_path,
-                                            em_destaque: false,
+                                            em_destaque: piece.em_destaque ?? false,
                                             created_at: new Date().toISOString()
                                           });
                                         }}
@@ -807,9 +861,16 @@ export default function CatalogoPublicoPage() {
 
               <div className="p-5 space-y-4">
                 <div>
-                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100/50">
-                    Composição Exclusiva IA
-                  </span>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100/50">
+                      Composição Exclusiva IA
+                    </span>
+                    {(selectedLook.pieces ?? []).some((p) => p.em_destaque) && (
+                      <span className="text-[10px] uppercase font-extrabold tracking-wider text-white bg-amber-500 px-2 py-0.5 rounded border border-amber-100/50 flex items-center gap-0.5 animate-pulse">
+                        🔥 Em Promoção
+                      </span>
+                    )}
+                  </div>
                   <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">{selectedLook.nome}</h2>
                 </div>
 
@@ -831,7 +892,14 @@ export default function CatalogoPublicoPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate">{piece.nome}</p>
+                            <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1.5">
+                              {piece.nome}
+                              {piece.em_destaque && (
+                                <span className="text-[8px] bg-amber-500 text-white font-extrabold px-1 rounded uppercase tracking-wider">
+                                  Promo
+                                </span>
+                              )}
+                            </p>
                             <p className="text-[10px] uppercase font-bold text-rose-400 leading-none mt-0.5">{piece.papel}</p>
                           </div>
                           <span className="text-xs font-bold text-gray-900 pr-1">R$ {piece.preco_venda.toFixed(2)}</span>

@@ -191,6 +191,9 @@ def _look_pieces(db: Session, look: Look) -> dict:
                 "papel": papel,
                 "preco_venda": prod.preco_venda,
                 "imagem_path": prod.imagem_path,
+                "em_destaque": prod.em_destaque,
+                "categoria": prod.categoria,
+                "marca": prod.marca,
             })
             valor_total += prod.preco_venda
     return {"pieces": pieces, "valor_total": valor_total}

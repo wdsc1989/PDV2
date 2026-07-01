@@ -20,6 +20,9 @@ class LookPieceResponse(BaseModel):
     papel: str
     preco_venda: float
     imagem_path: str | None = None
+    em_destaque: bool = False
+    categoria: str | None = None
+    marca: str | None = None
 
 
 class LookResponse(BaseModel):
