@@ -70,6 +70,7 @@ export default function CatalogoPublicoPage() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [onlyPromo, setOnlyPromo] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"relevancia" | "preco_asc" | "preco_desc" | "novidades">("relevancia");
 
   // Detalhes selecionados (Modais)
@@ -232,6 +233,18 @@ export default function CatalogoPublicoPage() {
       );
     }
 
+    if (selectedSize) {
+      result = result.filter((l) => {
+        try {
+          if (!l.opcoes) return false;
+          const parsed = JSON.parse(l.opcoes);
+          return parsed.tamanho === selectedSize;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
     // Ordenação Inteligente de Looks IA (Destaque > Promoção > Em Estoque > Novidades > Sem Estoque)
     result.sort((a, b) => {
       const isDestaqueA = (() => {
@@ -260,7 +273,7 @@ export default function CatalogoPublicoPage() {
     });
 
     return result;
-  }, [looks, search, selectedCategory, selectedBrand, minPrice, maxPrice, onlyPromo]);
+  }, [looks, search, selectedCategory, selectedBrand, minPrice, maxPrice, onlyPromo, selectedSize]);
 
   function copyLink() {
     if (typeof window === "undefined") return;
@@ -314,7 +327,26 @@ export default function CatalogoPublicoPage() {
         throw new Error(data.detail || "Falha ao registrar interesse.");
       }
 
-      alert("Prontinho! Suas informações foram salvas. Entraremos em contato em breve.");
+      // Lógica de Redirecionamento para o WhatsApp da Loja (11 965903464)
+      let waText = "";
+      if (leadType === "look" && targetLookId) {
+        const lookObj = looks.find(x => x.id === targetLookId);
+        const lookName = lookObj ? (lookObj.nome && lookObj.nome.toLowerCase() !== "look" ? lookObj.nome : (lookObj.pieces && lookObj.pieces.length > 0 ? lookObj.pieces.map(p => p.nome).join(" + ") : "Composição Especial")) : "Composição IA";
+        waText = `Olá! Sou o(a) ${leadForm.nome.trim() || 'cliente'}. Tenho interesse na composição: "${lookName}". Link do Look: https://www.vieiraclosetboutique.cloud/catalogo?look_id=${targetLookId}`;
+      } else if (leadType === "produto" && targetProductId) {
+        const prodObj = products.find(x => x.id === targetProductId);
+        const prodName = prodObj ? prodObj.nome : "Peça do Catálogo";
+        waText = `Olá! Sou o(a) ${leadForm.nome.trim() || 'cliente'}. Tenho interesse na peça: "${prodName}". Link: https://www.vieiraclosetboutique.cloud/catalogo?product_id=${targetProductId}`;
+      } else {
+        waText = `Olá! Sou o(a) ${leadForm.nome.trim() || 'cliente'}. Gostaria de receber novidades e atualizações sobre novas peças e looks!`;
+      }
+
+      const waUrl = `https://api.whatsapp.com/send?phone=5511965903464&text=${encodeURIComponent(waText)}`;
+      if (typeof window !== "undefined") {
+        window.open(waUrl, "_blank");
+      }
+
+      alert("Interesse registrado! Abrindo WhatsApp da loja para iniciar o seu atendimento...");
       setLeadForm({ nome: "", email: "", whatsapp: "", consent: false });
       setIsLeadModalOpen(false);
     } catch (err: any) {
@@ -505,7 +537,7 @@ export default function CatalogoPublicoPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
                         </svg>
                         Filtros
-                        {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo) && (
+                        {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo || selectedSize) && (
                           <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block animate-pulse"></span>
                         )}
                       </span>
@@ -519,7 +551,7 @@ export default function CatalogoPublicoPage() {
                   <div className={`space-y-6 lg:block ${showFilters ? 'block' : 'hidden'} bg-white rounded-2xl border border-rose-100/50 p-5 shadow-sm`}>
                     <div className="flex items-center justify-between pb-3 border-b border-rose-100/40">
                       <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wider">Filtrar Composições</h3>
-                      {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo) && (
+                      {(selectedCategory || selectedBrand || minPrice || maxPrice || onlyPromo || selectedSize) && (
                         <button
                           onClick={() => {
                             setSelectedCategory("");
@@ -527,6 +559,7 @@ export default function CatalogoPublicoPage() {
                             setMinPrice("");
                             setMaxPrice("");
                             setOnlyPromo(false);
+                            setSelectedSize(null);
                           }}
                           className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors uppercase cursor-pointer"
                         >
@@ -593,6 +626,32 @@ export default function CatalogoPublicoPage() {
                             className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-rose-100 focus:outline-none focus:ring-1 focus:ring-rose-400"
                           />
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Filtro por Tamanho */}
+                    <div className="space-y-2 pt-4 border-t border-rose-100/30">
+                      <h4 className="text-[11px] font-extrabold uppercase text-gray-400 tracking-wider">Tamanho do Look</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {([
+                          ["P", "P"],
+                          ["M", "M"],
+                          ["G", "G"],
+                          ["GG", "GG"],
+                          ["PLUSIZE", "Plus Size"]
+                        ] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            onClick={() => setSelectedSize(selectedSize === val ? null : val)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                              selectedSize === val
+                                ? "bg-rose-600 border-rose-600 text-white shadow-sm"
+                                : "bg-white border-rose-100 text-gray-600 hover:bg-rose-50/40"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -712,20 +771,6 @@ export default function CatalogoPublicoPage() {
                                 className="h-full w-full object-cover group-hover:scale-120 transition-transform duration-300 ease-out"
                               />
                               <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-rose-600 text-white shadow-md">
-                                  Composição IA
-                                </span>
-                                {(() => {
-                                  let isDestaque = false;
-                                  try {
-                                    if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
-                                  } catch(e){}
-                                  return isDestaque && (
-                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-md flex items-center gap-0.5">
-                                      ★ Destaque
-                                    </span>
-                                  );
-                                })()}
                                 {(l.pieces ?? []).some((piece) => piece.em_destaque === true) && (
                                   <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-md flex items-center gap-0.5 animate-pulse">
                                     🔥 Promoção

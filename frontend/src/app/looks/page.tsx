@@ -211,6 +211,53 @@ function AdminLooksView() {
     extra_prompt: "",
   });
 
+  const [adminSearch, setAdminSearch] = useState("");
+  const [adminStatus, setAdminStatus] = useState<"todos" | "publicados" | "privados">("todos");
+  const [adminDestaque, setAdminDestaque] = useState<"todos" | "destaques">("todos");
+  const [adminSize, setAdminSize] = useState<"todos" | "P" | "M" | "G" | "GG" | "PLUSIZE">("todos");
+
+  const filteredAdminLooks = useMemo(() => {
+    let result = [...looks];
+    
+    if (adminSearch.trim()) {
+      const q = adminSearch.toLowerCase().trim();
+      result = result.filter(
+        (l) =>
+          l.nome.toLowerCase().includes(q) ||
+          (l.pieces ?? []).some((p) => p.nome.toLowerCase().includes(q))
+      );
+    }
+    
+    if (adminStatus === "publicados") {
+      result = result.filter((l) => l.publicado);
+    } else if (adminStatus === "privados") {
+      result = result.filter((l) => !l.publicado);
+    }
+    
+    if (adminDestaque === "destaques") {
+      result = result.filter((l) => {
+        try {
+          return l.opcoes && JSON.parse(l.opcoes).em_destaque === true;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+    
+    if (adminSize !== "todos") {
+      result = result.filter((l) => {
+        try {
+          return l.opcoes && JSON.parse(l.opcoes).tamanho === adminSize;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+    
+    result.sort((a, b) => b.id - a.id);
+    return result;
+  }, [looks, adminSearch, adminStatus, adminDestaque, adminSize]);
+
   const loadProducts = () =>
     apiFetch<Product[]>("/products?active_only=true").then(setProducts).catch(() => setProducts([]));
   const loadLooks = () => apiFetch<Look[]>("/looks").then(setLooks).catch(() => setLooks([]));
@@ -381,12 +428,54 @@ function AdminLooksView() {
         </form>
       </Card>
 
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Looks gerados na vitrine</h2>
-      {looks.length === 0 ? (
-        <p className="text-sm text-gray-500">Nenhum look gerado ainda.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Looks gerados na vitrine</h2>
+        <span className="text-xs font-semibold text-gray-500 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1">
+          {filteredAdminLooks.length} looks correspondentes
+        </span>
+      </div>
+
+      {/* Barra de Filtros dos Looks no Admin */}
+      <div className="bg-white rounded-2xl border border-rose-100/40 p-4 shadow-sm space-y-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div>
+            <Label htmlFor="admin-search" className="text-xs text-gray-500 font-bold uppercase">Buscar por Nome / Peça</Label>
+            <Input id="admin-search" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} placeholder="Ex.: Leticia, Morgana..." className="h-9 text-xs" />
+          </div>
+          <div>
+            <Label htmlFor="admin-status" className="text-xs text-gray-500 font-bold uppercase">Status no Catálogo</Label>
+            <select id="admin-status" value={adminStatus} onChange={(e) => setAdminStatus(e.target.value as any)} className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500">
+              <option value="todos">Todos os Status</option>
+              <option value="publicados">Publicados (Catálogo)</option>
+              <option value="privados">Privados (Rascunho)</option>
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="admin-destaque" className="text-xs text-gray-500 font-bold uppercase">Destaque</Label>
+            <select id="admin-destaque" value={adminDestaque} onChange={(e) => setAdminDestaque(e.target.value as any)} className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500">
+              <option value="todos">Todos os Looks</option>
+              <option value="destaques">Apenas Destaques</option>
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="admin-size" className="text-xs text-gray-500 font-bold uppercase">Tamanho Recomendado</Label>
+            <select id="admin-size" value={adminSize} onChange={(e) => setAdminSize(e.target.value as any)} className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500">
+              <option value="todos">Todos os Tamanhos</option>
+              <option value="P">Tamanho P</option>
+              <option value="M">Tamanho M</option>
+              <option value="G">Tamanho G</option>
+              <option value="GG">Tamanho GG</option>
+              <option value="PLUSIZE">Plus Size</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {filteredAdminLooks.length === 0 ? (
+        <p className="text-sm text-gray-500">Nenhum look correspondente aos filtros.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {looks.map((l) => (
+          {filteredAdminLooks.map((l) => (
             <Card key={l.id} className="overflow-hidden p-0 flex flex-col justify-between">
               <div>
                 <div className="relative aspect-[3/4] bg-rose-50 overflow-hidden flex items-center justify-center">
