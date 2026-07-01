@@ -23,6 +23,7 @@ class LookPieceResponse(BaseModel):
     em_destaque: bool = False
     categoria: str | None = None
     marca: str | None = None
+    estoque_atual: float = 0.0
 
 
 class LookResponse(BaseModel):

@@ -12,6 +12,7 @@ type CatalogProduct = {
   imagem_path: string | null;
   em_destaque: boolean;
   created_at: string;
+  estoque_atual?: number;
 };
 
 type LookPiece = {
@@ -23,6 +24,7 @@ type LookPiece = {
   em_destaque?: boolean;
   categoria?: string | null;
   marca?: string | null;
+  estoque_atual?: number;
 };
 
 type CatalogLook = {
@@ -311,6 +313,7 @@ export default function CatalogoPublicoPage() {
 
   return (
     <div className="min-h-screen bg-rose-50/20 font-sans text-gray-800 pb-16">
+      <title>Catálogo IA - Vieira Closet Boutique</title>
       {/* Header Sticky */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-rose-100/60 shadow-sm">
         <div className="mx-auto max-w-[95%] 2xl:max-w-[1500px] px-4 py-4 flex items-center justify-between gap-4">
@@ -709,7 +712,8 @@ export default function CatalogoPublicoPage() {
                                             preco_venda: piece.preco_venda,
                                             imagem_path: piece.imagem_path,
                                             em_destaque: piece.em_destaque ?? false,
-                                            created_at: new Date().toISOString()
+                                            created_at: new Date().toISOString(),
+                                            estoque_atual: piece.estoque_atual ?? 0
                                           });
                                         }}
                                         className="relative group/piece transition-all duration-200"
@@ -730,16 +734,16 @@ export default function CatalogoPublicoPage() {
                             <div className="p-4 flex-1 flex flex-col justify-between">
                               <div>
                                 <h3 className="font-extrabold text-sm text-gray-900 group-hover:text-rose-600 transition-colors leading-snug">
-                                  {l.nome}
+                                  {l.nome && l.nome.toLowerCase() !== "look" 
+                                    ? l.nome 
+                                    : (l.pieces && l.pieces.length > 0 
+                                        ? l.pieces.map(p => p.nome).join(" + ") 
+                                        : "Composição Especial")}
                                 </h3>
-                                {l.pieces && l.pieces.length > 0 && (
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    {l.pieces.map((p) => (
-                                      <span key={p.id} className="text-[10px] bg-rose-50 text-rose-600 font-semibold px-2 py-0.5 rounded border border-rose-100/40">
-                                        {p.nome}
-                                      </span>
-                                    ))}
-                                  </div>
+                                {(l.pieces ?? []).some((piece) => (piece.estoque_atual ?? 0) <= 0) && (
+                                  <span className="inline-block mt-2 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-gray-100 text-gray-500 border border-gray-200">
+                                    🚫 Sob Consulta (Sem Estoque)
+                                  </span>
                                 )}
                               </div>
                               <div className="mt-4 pt-3 border-t border-rose-50 flex items-center justify-between">
@@ -807,6 +811,17 @@ export default function CatalogoPublicoPage() {
                 {selectedProduct.marca && (
                   <p className="text-xs text-gray-400 font-semibold mt-0.5">Marca: {selectedProduct.marca}</p>
                 )}
+
+                {/* Alerta de Produto Indisponível */}
+                {(selectedProduct.estoque_atual ?? 0) <= 0 && (
+                  <div className="p-3.5 mt-2 rounded-xl border border-amber-100 bg-amber-50/50 text-[11px] text-amber-800 leading-relaxed flex items-start gap-2.5 shadow-inner">
+                    <span className="text-base mt-0.5" aria-hidden="true">⚠️</span>
+                    <div>
+                      <strong className="font-bold block mb-0.5">Este produto está temporariamente indisponível.</strong>
+                      Deixe seus dados clicando em <strong className="font-bold uppercase">"Consultar Equivalentes"</strong> para que nossa equipe te recomende peças semelhantes em estoque!
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -825,9 +840,15 @@ export default function CatalogoPublicoPage() {
                     setSelectedProduct(null);
                   }
                 }}
-                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all cursor-pointer"
+                className={`${
+                  (selectedProduct.estoque_atual ?? 0) <= 0
+                    ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+                    : "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
+                } text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer`}
               >
-                Eu quero!
+                {(selectedProduct.estoque_atual ?? 0) <= 0
+                  ? "Consultar Equivalentes"
+                  : "Eu quero!"}
               </button>
             </div>
           </div>
@@ -871,7 +892,13 @@ export default function CatalogoPublicoPage() {
                       </span>
                     )}
                   </div>
-                  <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">{selectedLook.nome}</h2>
+                  <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">
+                    {selectedLook.nome && selectedLook.nome.toLowerCase() !== "look" 
+                      ? selectedLook.nome 
+                      : (selectedLook.pieces && selectedLook.pieces.length > 0 
+                          ? selectedLook.pieces.map(p => p.nome).join(" + ") 
+                          : "Composição Especial")}
+                  </h2>
                 </div>
 
                 {/* Peças que compõem */}
@@ -892,11 +919,16 @@ export default function CatalogoPublicoPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1.5 flex-wrap">
                               {piece.nome}
                               {piece.em_destaque && (
                                 <span className="text-[8px] bg-amber-500 text-white font-extrabold px-1 rounded uppercase tracking-wider">
                                   Promo
+                                </span>
+                              )}
+                              {(piece.estoque_atual ?? 0) <= 0 && (
+                                <span className="text-[8px] bg-gray-400 text-white font-extrabold px-1 rounded uppercase tracking-wider">
+                                  Sem Estoque
                                 </span>
                               )}
                             </p>
@@ -905,6 +937,17 @@ export default function CatalogoPublicoPage() {
                           <span className="text-xs font-bold text-gray-900 pr-1">R$ {piece.preco_venda.toFixed(2)}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alerta de Peças Indisponíveis (Para capturar o lead mesmo sem estoque) */}
+                {(selectedLook.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0) && (
+                  <div className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/50 text-[11px] text-amber-800 leading-relaxed flex items-start gap-2.5 shadow-inner">
+                    <span className="text-base mt-0.5" aria-hidden="true">⚠️</span>
+                    <div>
+                      <strong className="font-bold block mb-0.5">Algumas peças deste look estão sem estoque físico.</strong>
+                      Você ainda pode clicar em <strong className="font-bold uppercase">"Consultar Equivalentes"</strong> abaixo! Nossa atendente entrará em contato para encontrar opções semelhantes e montar sua composição personalizada.
                     </div>
                   </div>
                 )}
@@ -924,9 +967,15 @@ export default function CatalogoPublicoPage() {
                   setSelectedLook(null);
                   openLeadModal("look", selectedLook.id);
                 }}
-                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all cursor-pointer"
+                className={`${
+                  (selectedLook.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0)
+                    ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+                    : "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
+                } text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer`}
               >
-                Quero este look!
+                {(selectedLook.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0)
+                  ? "Consultar Equivalentes"
+                  : "Quero este look!"}
               </button>
             </div>
           </div>
