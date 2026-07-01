@@ -58,7 +58,7 @@ export default function CatalogoPublicoPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Filtros/Estadíos adicionais
-  const [activeTab, setActiveTab] = useState<"produtos" | "looks">("produtos");
+  const [activeTab, setActiveTab] = useState<"produtos" | "looks">("looks");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [minPrice, setMinPrice] = useState("");
@@ -329,27 +329,31 @@ export default function CatalogoPublicoPage() {
             </svg>
           </div>
 
-          <div className="flex border-b border-gray-100">
-            <button
-              onClick={() => setActiveTab("produtos")}
-              className={`flex-1 py-2 text-center text-sm font-bold border-b-2 transition-all ${
-                activeTab === "produtos"
-                  ? "border-rose-500 text-rose-600"
-                  : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
+          {/* Banner Informativo IA e Link Instagram */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 mt-1 rounded-2xl border border-rose-100/60 bg-gradient-to-r from-rose-50/70 to-amber-50/50 shadow-sm animate-fade-in">
+            <div className="flex items-start gap-3">
+              <span className="text-xl mt-0.5 shrink-0" aria-hidden="true">✨</span>
+              <div>
+                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  Composições de Moda Geradas por IA
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                  Todas as modelos e looks desta vitrine são criados por Inteligência Artificial para demonstrar as combinações de peças. 
+                  Deseja ver fotos reais das roupas vestidas? Visite o nosso Instagram!
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://www.instagram.com/vieiraclosett/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all w-full md:w-auto shrink-0 group cursor-pointer"
             >
-              Vestuário ({filteredAndSortedProducts.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("looks")}
-              className={`flex-1 py-2 text-center text-sm font-bold border-b-2 transition-all ${
-                activeTab === "looks"
-                  ? "border-rose-500 text-rose-600"
-                  : "border-transparent text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              Composições / Looks IA ({filteredLooks.length})
-            </button>
+              <svg className="w-4 h-4 text-white group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+              </svg>
+              Ver Fotos Reais (Instagram)
+            </a>
           </div>
         </div>
       </header>
@@ -725,7 +729,8 @@ export default function CatalogoPublicoPage() {
               </svg>
             </button>
 
-            <div className="overflow-y-auto">
+            {/* Área rolável: Imagem + Detalhes do Produto */}
+            <div className="overflow-y-auto flex-1">
               <div className="aspect-[9/16] bg-rose-50 flex items-center justify-center overflow-hidden">
                 {selectedProduct.imagem_path ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -738,39 +743,38 @@ export default function CatalogoPublicoPage() {
                   <PlaceholderIcon />
                 )}
               </div>
-              <div className="p-5 space-y-4">
-                <div>
-                  {selectedProduct.categoria && (
-                    <span className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100/50">
-                      {selectedProduct.categoria}
-                    </span>
-                  )}
-                  <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">{selectedProduct.nome}</h2>
-                  {selectedProduct.marca && (
-                    <p className="text-xs text-gray-400 font-semibold mt-0.5">Marca: {selectedProduct.marca}</p>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-rose-50 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">Preço Especial</span>
-                    <p className="font-heading text-2xl font-black text-rose-600">
-                      R$ {selectedProduct.preco_venda.toFixed(2)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (selectedProduct) {
-                        openLeadModal("produto", selectedProduct.id);
-                        setSelectedProduct(null);
-                      }
-                    }}
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all"
-                  >
-                    Eu quero!
-                  </button>
-                </div>
+              <div className="p-5">
+                {selectedProduct.categoria && (
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100/50">
+                    {selectedProduct.categoria}
+                  </span>
+                )}
+                <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">{selectedProduct.nome}</h2>
+                {selectedProduct.marca && (
+                  <p className="text-xs text-gray-400 font-semibold mt-0.5">Marca: {selectedProduct.marca}</p>
+                )}
               </div>
+            </div>
+
+            {/* Rodapé Fixo */}
+            <div className="p-5 border-t border-rose-50 bg-white flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Preço Especial</span>
+                <p className="font-heading text-2xl font-black text-rose-600">
+                  R$ {selectedProduct.preco_venda.toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (selectedProduct) {
+                    openLeadModal("produto", selectedProduct.id);
+                    setSelectedProduct(null);
+                  }
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all cursor-pointer"
+              >
+                Eu quero!
+              </button>
             </div>
           </div>
         </div>
@@ -790,7 +794,8 @@ export default function CatalogoPublicoPage() {
               </svg>
             </button>
 
-            <div className="overflow-y-auto">
+            {/* Área rolável: Imagem + Peças do Look */}
+            <div className="overflow-y-auto flex-1">
               <div className="aspect-[9/16] bg-rose-50 flex items-center justify-center overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -835,25 +840,26 @@ export default function CatalogoPublicoPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="pt-3 border-t border-rose-50 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">Preço do Look Completo</span>
-                    <p className="font-heading text-2xl font-black text-rose-600">
-                      R$ {(selectedLook.valor_total ?? 0).toFixed(2)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedLook(null);
-                      openLeadModal("look", selectedLook.id);
-                    }}
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all"
-                  >
-                    Quero este look!
-                  </button>
-                </div>
               </div>
+            </div>
+
+            {/* Rodapé Fixo */}
+            <div className="p-5 border-t border-rose-50 bg-white flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+              <div>
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Preço do Look Completo</span>
+                <p className="font-heading text-2xl font-black text-rose-600">
+                  R$ {(selectedLook.valor_total ?? 0).toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedLook(null);
+                  openLeadModal("look", selectedLook.id);
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-rose-200 active:scale-95 transition-all cursor-pointer"
+              >
+                Quero este look!
+              </button>
             </div>
           </div>
         </div>
