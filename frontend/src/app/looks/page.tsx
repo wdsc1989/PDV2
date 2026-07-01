@@ -329,7 +329,7 @@ function AdminLooksView() {
     }
   }
 
-  async function handleToggleDestaque(id: number, currentOpcoes: string | undefined) {
+  async function handleUpdatePrioridade(id: number, currentOpcoes: string | undefined, val: string) {
     try {
       let parsed = {};
       try {
@@ -338,10 +338,12 @@ function AdminLooksView() {
         parsed = {};
       }
       
-      const newDestaque = !(parsed as any).em_destaque;
+      const numVal = val.trim() === "" ? null : Number(val);
+      const isDestaque = numVal !== null && numVal > 0;
       const updatedOpcoes = JSON.stringify({
         ...parsed,
-        em_destaque: newDestaque
+        em_destaque: isDestaque,
+        prioridade_destaque: numVal
       });
       
       await apiFetch(`/looks/${id}`, {
@@ -349,10 +351,10 @@ function AdminLooksView() {
         body: JSON.stringify({ opcoes: updatedOpcoes }),
       });
       
-      toast.success(newDestaque ? "Look marcado como destaque!" : "Look removido dos destaques.");
+      toast.success(isDestaque ? `Look definido na posição ${numVal}!` : "Destaque removido.");
       loadLooks();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao alterar destaque.");
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar prioridade.");
     }
   }
 
@@ -486,12 +488,17 @@ function AdminLooksView() {
                     </Badge>
                     {(() => {
                       let isDestaque = false;
+                      let prioridade = null;
                       try {
-                        if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
+                        if (l.opcoes) {
+                          const parsed = JSON.parse(l.opcoes);
+                          isDestaque = parsed.em_destaque === true;
+                          prioridade = parsed.prioridade_destaque;
+                        }
                       } catch(e){}
                       return isDestaque && (
                         <Badge variant="warning" className="bg-amber-500 text-white border-amber-500 font-extrabold text-[10px] px-2 py-0.5 shadow-sm">
-                          ★ Destaque
+                          ★ Pos. {prioridade || "Destaque"}
                         </Badge>
                       );
                     })()}
@@ -525,22 +532,30 @@ function AdminLooksView() {
               </div>
               <div className="p-3 pt-0 space-y-2">
                 {(() => {
-                  let isDestaque = false;
+                  let currentPrioridade = "";
                   try {
-                    if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
+                    if (l.opcoes) {
+                      const parsed = JSON.parse(l.opcoes);
+                      if (parsed.prioridade_destaque !== undefined && parsed.prioridade_destaque !== null) {
+                        currentPrioridade = String(parsed.prioridade_destaque);
+                      }
+                    }
                   } catch(e){}
+                  
                   return (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleDestaque(l.id, l.opcoes)}
-                      className={`w-full min-h-[32px] text-xs font-bold rounded-lg border py-1 transition-colors ${
-                        isDestaque
-                          ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-sm"
-                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      {isDestaque ? "★ Destacado" : "☆ Destacar no Catálogo"}
-                    </button>
+                    <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg border border-amber-100 bg-amber-50/40">
+                      <span className="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                        ★ Posição:
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Não dest."
+                        value={currentPrioridade}
+                        onChange={(e) => handleUpdatePrioridade(l.id, l.opcoes, e.target.value)}
+                        className="w-20 h-7 text-xs text-center font-bold text-gray-800 rounded border border-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
+                      />
+                    </div>
                   );
                 })()}
 

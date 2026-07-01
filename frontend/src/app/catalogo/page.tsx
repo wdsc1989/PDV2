@@ -245,20 +245,37 @@ export default function CatalogoPublicoPage() {
       });
     }
 
-    // Ordenação Inteligente de Looks IA (Destaque > Promoção > Em Estoque > Novidades > Sem Estoque)
+    // Ordenação Inteligente de Looks IA (Destaque Manual Ordenado > Promoção > Em Estoque > Novidades > Sem Estoque)
     result.sort((a, b) => {
-      const isDestaqueA = (() => {
+      const prioA = (() => {
         try {
-          if (a.opcoes) return JSON.parse(a.opcoes).em_destaque === true;
+          if (a.opcoes) {
+            const parsed = JSON.parse(a.opcoes);
+            if (parsed.prioridade_destaque !== undefined && parsed.prioridade_destaque !== null && parsed.prioridade_destaque > 0) {
+              return parsed.prioridade_destaque;
+            }
+          }
         } catch(e){}
-        return false;
+        return 999999;
       })();
-      const isDestaqueB = (() => {
+
+      const prioB = (() => {
         try {
-          if (b.opcoes) return JSON.parse(b.opcoes).em_destaque === true;
+          if (b.opcoes) {
+            const parsed = JSON.parse(b.opcoes);
+            if (parsed.prioridade_destaque !== undefined && parsed.prioridade_destaque !== null && parsed.prioridade_destaque > 0) {
+              return parsed.prioridade_destaque;
+            }
+          }
         } catch(e){}
-        return false;
+        return 999999;
       })();
+
+      if (prioA !== 999999 || prioB !== 999999) {
+        if (prioA !== prioB) {
+          return prioA - prioB; // Ordem crescente (1, 2, 3...)
+        }
+      }
 
       const hasPromoA = (a.pieces ?? []).some((p) => p.em_destaque === true);
       const hasPromoB = (b.pieces ?? []).some((p) => p.em_destaque === true);
@@ -266,8 +283,8 @@ export default function CatalogoPublicoPage() {
       const hasOutOfStockA = (a.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0);
       const hasOutOfStockB = (b.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0);
 
-      const scoreA = (isDestaqueA ? 100 : 0) + (hasPromoA ? 30 : 0) + (hasOutOfStockA ? -500 : 10) + a.id / 10000;
-      const scoreB = (isDestaqueB ? 100 : 0) + (hasPromoB ? 30 : 0) + (hasOutOfStockB ? -500 : 10) + b.id / 10000;
+      const scoreA = (hasPromoA ? 30 : 0) + (hasOutOfStockA ? -500 : 10) + a.id / 10000;
+      const scoreB = (hasPromoB ? 30 : 0) + (hasOutOfStockB ? -500 : 10) + b.id / 10000;
 
       return scoreB - scoreA;
     });
