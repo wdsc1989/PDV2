@@ -26,6 +26,7 @@ type Look = {
   created_at: string;
   pieces?: ProductPiece[];
   valor_total?: number;
+  opcoes?: string;
 };
 
 const POSES = [
@@ -281,6 +282,33 @@ function AdminLooksView() {
     }
   }
 
+  async function handleToggleDestaque(id: number, currentOpcoes: string | undefined) {
+    try {
+      let parsed = {};
+      try {
+        if (currentOpcoes) parsed = JSON.parse(currentOpcoes);
+      } catch (e) {
+        parsed = {};
+      }
+      
+      const newDestaque = !(parsed as any).em_destaque;
+      const updatedOpcoes = JSON.stringify({
+        ...parsed,
+        em_destaque: newDestaque
+      });
+      
+      await apiFetch(`/looks/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ opcoes: updatedOpcoes }),
+      });
+      
+      toast.success(newDestaque ? "Look marcado como destaque!" : "Look removido dos destaques.");
+      loadLooks();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao alterar destaque.");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Looks (IA) — Painel de Controle" subtitle="Combine fotos de produtos e gere modelos virtuais para o catálogo público" />
@@ -363,10 +391,21 @@ function AdminLooksView() {
               <div>
                 <div className="relative aspect-[3/4] bg-rose-50 overflow-hidden flex items-center justify-center">
                   <img src={assetUrl(l.imagem_path) ?? undefined} alt={l.nome} loading="lazy" className="h-full w-full object-cover" />
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     <Badge variant={l.publicado ? "success" : "default"}>
                       {l.publicado ? "No catálogo" : "Privado"}
                     </Badge>
+                    {(() => {
+                      let isDestaque = false;
+                      try {
+                        if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
+                      } catch(e){}
+                      return isDestaque && (
+                        <Badge variant="warning" className="bg-amber-500 text-white border-amber-500 font-extrabold text-[10px] px-2 py-0.5 shadow-sm">
+                          ★ Destaque
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="p-3 space-y-2 flex-1">
@@ -396,6 +435,26 @@ function AdminLooksView() {
                 </div>
               </div>
               <div className="p-3 pt-0 space-y-2">
+                {(() => {
+                  let isDestaque = false;
+                  try {
+                    if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
+                  } catch(e){}
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleDestaque(l.id, l.opcoes)}
+                      className={`w-full min-h-[32px] text-xs font-bold rounded-lg border py-1 transition-colors ${
+                        isDestaque
+                          ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {isDestaque ? "★ Destacado" : "☆ Destacar no Catálogo"}
+                    </button>
+                  );
+                })()}
+
                 <button
                   type="button"
                   onClick={() => handleTogglePublicado(l.id, l.publicado)}

@@ -35,6 +35,7 @@ class LookResponse(BaseModel):
     created_at: datetime
     pieces: list[LookPieceResponse] = []
     valor_total: float = 0.0
+    opcoes: str | None = None
 
     class Config:
         from_attributes = True

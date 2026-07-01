@@ -201,7 +201,8 @@ def _look_pieces(db: Session, look: Look) -> dict:
 
 
 class LookPatch(BaseModel):
-    publicado: bool
+    publicado: bool | None = None
+    opcoes: str | None = None
 
 
 @router.patch("/{look_id}", response_model=LookResponse)
@@ -214,7 +215,10 @@ def patch_look(
     look = db.query(Look).filter(Look.id == look_id).first()
     if not look:
         raise HTTPException(status_code=404, detail="Look não encontrado")
-    look.publicado = body.publicado
+    if body.publicado is not None:
+        look.publicado = body.publicado
+    if body.opcoes is not None:
+        look.opcoes = body.opcoes
     db.commit()
     db.refresh(look)
     

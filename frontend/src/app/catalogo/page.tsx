@@ -36,6 +36,7 @@ type CatalogLook = {
   created_at: string;
   pieces?: LookPiece[];
   valor_total?: number;
+  opcoes?: string | null;
 };
 
 const API_BASE =
@@ -231,6 +232,33 @@ export default function CatalogoPublicoPage() {
       );
     }
 
+    // Ordenação Inteligente de Looks IA (Destaque > Promoção > Em Estoque > Novidades > Sem Estoque)
+    result.sort((a, b) => {
+      const isDestaqueA = (() => {
+        try {
+          if (a.opcoes) return JSON.parse(a.opcoes).em_destaque === true;
+        } catch(e){}
+        return false;
+      })();
+      const isDestaqueB = (() => {
+        try {
+          if (b.opcoes) return JSON.parse(b.opcoes).em_destaque === true;
+        } catch(e){}
+        return false;
+      })();
+
+      const hasPromoA = (a.pieces ?? []).some((p) => p.em_destaque === true);
+      const hasPromoB = (b.pieces ?? []).some((p) => p.em_destaque === true);
+
+      const hasOutOfStockA = (a.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0);
+      const hasOutOfStockB = (b.pieces ?? []).some((p) => (p.estoque_atual ?? 0) <= 0);
+
+      const scoreA = (isDestaqueA ? 100 : 0) + (hasPromoA ? 30 : 0) + (hasOutOfStockA ? -500 : 10) + a.id / 10000;
+      const scoreB = (isDestaqueB ? 100 : 0) + (hasPromoB ? 30 : 0) + (hasOutOfStockB ? -500 : 10) + b.id / 10000;
+
+      return scoreB - scoreA;
+    });
+
     return result;
   }, [looks, search, selectedCategory, selectedBrand, minPrice, maxPrice, onlyPromo]);
 
@@ -368,16 +396,19 @@ export default function CatalogoPublicoPage() {
           </div>
 
           {/* Banner Informativo IA e Link Instagram */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 mt-1 rounded-2xl border border-rose-100/60 bg-gradient-to-r from-rose-50/70 to-amber-50/50 shadow-sm animate-fade-in">
-            <div className="flex items-start gap-3">
-              <span className="text-xl mt-0.5 shrink-0" aria-hidden="true">✨</span>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 p-3 md:p-4 mt-1 rounded-2xl border border-rose-100/60 bg-gradient-to-r from-rose-50/70 to-amber-50/50 shadow-sm animate-fade-in">
+            <div className="flex items-start gap-2.5 md:gap-3">
+              <span className="text-lg md:text-xl shrink-0" aria-hidden="true">✨</span>
               <div>
-                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                  Composições de Moda Geradas por IA
+                <h3 className="text-xs font-extrabold text-gray-900 flex items-center gap-1.5 leading-snug">
+                  Composições Geradas por IA
                 </h3>
-                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                <p className="hidden md:block text-[11px] text-gray-500 mt-1 leading-relaxed">
                   Todas as modelos e looks desta vitrine são criados por Inteligência Artificial para demonstrar as combinações de peças. 
                   Deseja ver fotos reais das roupas vestidas? Visite o nosso Instagram!
+                </p>
+                <p className="md:hidden text-[10px] text-gray-500 mt-0.5 leading-tight">
+                  Modelos virtuais ilustrativas. Veja fotos reais das roupas em nosso Instagram.
                 </p>
               </div>
             </div>
@@ -385,12 +416,12 @@ export default function CatalogoPublicoPage() {
               href="https://www.instagram.com/vieiraclosett/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all w-full md:w-auto shrink-0 group cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 text-[10px] md:text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all w-full md:w-auto shrink-0 group cursor-pointer"
             >
-              <svg className="w-4 h-4 text-white group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-white group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
               </svg>
-              Ver Fotos Reais (Instagram)
+              Ver no Instagram
             </a>
           </div>
         </div>
@@ -684,6 +715,17 @@ export default function CatalogoPublicoPage() {
                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-rose-600 text-white shadow-md">
                                   Composição IA
                                 </span>
+                                {(() => {
+                                  let isDestaque = false;
+                                  try {
+                                    if (l.opcoes) isDestaque = JSON.parse(l.opcoes).em_destaque === true;
+                                  } catch(e){}
+                                  return isDestaque && (
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-md flex items-center gap-0.5">
+                                      ★ Destaque
+                                    </span>
+                                  );
+                                })()}
                                 {(l.pieces ?? []).some((piece) => piece.em_destaque === true) && (
                                   <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500 text-white shadow-md flex items-center gap-0.5 animate-pulse">
                                     🔥 Promoção
