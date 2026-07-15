@@ -111,6 +111,8 @@ def create_product(
         no_catalogo=body.no_catalogo,
         em_destaque=body.em_destaque,
         categoria_id=body.categoria_id,
+        cores=body.cores,
+        tamanhos=body.tamanhos,
     )
     db.add(p)
     db.commit()

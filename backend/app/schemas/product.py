@@ -15,6 +15,9 @@ class ProductBase(BaseModel):
     no_catalogo: bool = True
     em_destaque: bool = False
     categoria_id: int | None = None
+    # variacoes opcionais (informativas): cores e tamanhos disponiveis
+    cores: list[str] | None = None
+    tamanhos: list[str] | None = None
 
 
 class ProductCreate(ProductBase):
@@ -35,6 +38,8 @@ class ProductUpdate(BaseModel):
     em_destaque: bool | None = None
     categoria_id: int | None = None
     imagem_path: str | None = None
+    cores: list[str] | None = None
+    tamanhos: list[str] | None = None
 
 
 class ProductResponse(ProductBase):
@@ -56,6 +61,8 @@ class CatalogProduct(BaseModel):
     imagem_path: str | None = None
     em_destaque: bool
     created_at: datetime
+    cores: list[str] | None = None
+    tamanhos: list[str] | None = None
 
     class Config:
         from_attributes = True

@@ -13,6 +13,8 @@ type CatalogProduct = {
   em_destaque: boolean;
   created_at: string;
   estoque_atual?: number;
+  cores?: string[] | null;
+  tamanhos?: string[] | null;
 };
 
 type LookPiece = {
@@ -753,6 +755,15 @@ export default function CatalogoPublicoPage() {
                                 {p.marca && (
                                   <p className="mt-0.5 text-[10px] text-gray-400 font-medium">{p.marca}</p>
                                 )}
+                                {p.tamanhos && p.tamanhos.length > 0 && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {p.tamanhos.slice(0, 5).map((t) => (
+                                      <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-100">
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <p className="mt-2 font-heading text-base font-black text-rose-600 tabular-nums">
                                 R$ {p.preco_venda.toFixed(2)}
@@ -914,6 +925,32 @@ export default function CatalogoPublicoPage() {
                 <h2 className="mt-2 text-lg font-black text-gray-900 leading-snug">{selectedProduct.nome}</h2>
                 {selectedProduct.marca && (
                   <p className="text-xs text-gray-400 font-semibold mt-0.5">Marca: {selectedProduct.marca}</p>
+                )}
+
+                {/* Variacoes disponiveis (so a dimensao preenchida) */}
+                {selectedProduct.tamanhos && selectedProduct.tamanhos.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tamanhos</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedProduct.tamanhos.map((t) => (
+                        <span key={t} className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedProduct.cores && selectedProduct.cores.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Cores</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedProduct.cores.map((c) => (
+                        <span key={c} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 {/* Alerta de Produto Indisponível */}

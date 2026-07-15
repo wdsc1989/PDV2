@@ -36,6 +36,8 @@ type Product = {
   no_catalogo: boolean;
   imagem_path: string | null;
   em_destaque: boolean;
+  cores: string[] | null;
+  tamanhos: string[] | null;
 };
 
 const emptyForm = {
@@ -52,7 +54,87 @@ const emptyForm = {
   em_destaque: false,
   categoria_id: "",
   imagem_path: "",
+  cores: [] as string[],
+  tamanhos: [] as string[],
 };
+
+/**
+ * Entrada de "etiquetas" (chips) para as variacoes opcionais (cores/tamanhos).
+ * Digite e tecle Enter ou virgula para adicionar; remove no x. Nada obrigatorio.
+ */
+function ChipsInput({
+  id,
+  label,
+  ajuda,
+  placeholder,
+  valores,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  ajuda?: string;
+  placeholder?: string;
+  valores: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [texto, setTexto] = useState("");
+  function adicionar() {
+    const partes = texto
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!partes.length) return;
+    const novos = [...valores];
+    for (const p of partes) {
+      if (!novos.some((x) => x.toLowerCase() === p.toLowerCase())) novos.push(p);
+    }
+    onChange(novos);
+    setTexto("");
+  }
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          value={texto}
+          placeholder={placeholder}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              adicionar();
+            }
+          }}
+        />
+        <Button type="button" variant="secondary" onClick={adicionar}>
+          Adicionar
+        </Button>
+      </div>
+      {ajuda && <p className="mt-1 text-xs text-gray-500">{ajuda}</p>}
+      {valores.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {valores.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 rounded-full bg-[#A16207]/10 px-2.5 py-1 text-xs text-[#854D0E] ring-1 ring-[#A16207]/20"
+            >
+              {v}
+              <button
+                type="button"
+                aria-label={`Remover ${v}`}
+                onClick={() => onChange(valores.filter((x) => x !== v))}
+                className="text-[#A16207]/60 hover:text-[#854D0E]"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProdutosPage() {
   const searchParams = useSearchParams();
@@ -209,6 +291,8 @@ export default function ProdutosPage() {
       em_destaque: p.em_destaque,
       categoria_id: p.categoria_id != null ? String(p.categoria_id) : "",
       imagem_path: p.imagem_path || "",
+      cores: p.cores || [],
+      tamanhos: p.tamanhos || [],
     });
     setShowForm(true);
   }
@@ -231,6 +315,8 @@ export default function ProdutosPage() {
       em_destaque: form.em_destaque,
       categoria_id: form.categoria_id ? parseInt(form.categoria_id, 10) : null,
       imagem_path: form.imagem_path.trim() || null,
+      cores: form.cores.length ? form.cores : null,
+      tamanhos: form.tamanhos.length ? form.tamanhos : null,
     };
     try {
       let productId = editingId;
@@ -700,6 +786,26 @@ export default function ProdutosPage() {
                       <Input id="min" type="number" step="0.01" min="0" value={form.estoque_minimo} onChange={(e) => setForm((f) => ({ ...f, estoque_minimo: e.target.value }))} />
                     </div>
                   </div>
+                  {/* Variacoes opcionais: cor e tamanho — so informativas, refletem no catalogo */}
+                  <div className="grid grid-cols-1 gap-3 rounded-lg border border-[#A16207]/20 bg-[#A16207]/5 p-3 sm:grid-cols-2">
+                    <ChipsInput
+                      id="cores"
+                      label="Cores (opcional)"
+                      placeholder="Ex: Preto, Bege"
+                      ajuda="Tecle Enter ou vírgula para adicionar."
+                      valores={form.cores}
+                      onChange={(v) => setForm((f) => ({ ...f, cores: v }))}
+                    />
+                    <ChipsInput
+                      id="tamanhos"
+                      label="Tamanhos (opcional)"
+                      placeholder="Ex: P, M, G"
+                      ajuda="Aparecem no catálogo do produto."
+                      valores={form.tamanhos}
+                      onChange={(v) => setForm((f) => ({ ...f, tamanhos: v }))}
+                    />
+                  </div>
+
                   <div>
                     <Label htmlFor="imagem-file">Foto do produto</Label>
                     <div className="flex items-center gap-3">

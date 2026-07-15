@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -20,6 +20,10 @@ class Product(Base):
     estoque_atual = Column(Float, nullable=False, default=0.0)
     estoque_minimo = Column(Float, nullable=True)
     imagem_path = Column(String(255), nullable=True)
+    # variacoes OPCIONAIS (loja de roupas): listas de cores/tamanhos disponiveis.
+    # So informativas — nao afetam estoque nem venda; refletem no catalogo.
+    cores = Column(JSON, nullable=True)      # ex: ["Preto", "Bege"]
+    tamanhos = Column(JSON, nullable=True)   # ex: ["P", "M", "G"]
     no_catalogo = Column(Boolean, nullable=False, default=True)  # visível na vitrine pública
     em_destaque = Column(Boolean, nullable=False, default=False)  # visível na seção de destaques
     ativo = Column(Boolean, nullable=False, default=True)
