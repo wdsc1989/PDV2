@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/auth";
 import { apiFetch, assetUrl } from "@/api/client";
 import { EstoqueTab } from "@/components/produtos/EstoqueTab";
 import { CategoriasTab } from "@/components/produtos/CategoriasTab";
+import { VariacoesTab } from "@/components/produtos/VariacoesTab";
 import { Button, Card, Table, Input, Label, Select, toast, KpiCard, FilterBar, Badge, ConfirmModal, PageHeader } from "@/components/ui";
 import { BarcodeLabelModal, type BarcodeLabelProduct } from "@/components/produtos/BarcodeLabelModal";
 import { compressImage } from "@/lib/image";
@@ -59,47 +60,82 @@ const emptyForm = {
 };
 
 /**
- * Entrada de "etiquetas" (chips) para as variacoes opcionais (cores/tamanhos).
- * Digite e tecle Enter ou virgula para adicionar; remove no x. Nada obrigatorio.
+ * Seletor de variacao (cor/tamanho): mostra as opcoes JA CADASTRADAS como chips
+ * clicaveis (selecionar/desmarcar no produto) e permite adicionar uma nova — que
+ * ja fica cadastrada na lista padrao (onRegister) e selecionada aqui. Opcional.
  */
-function ChipsInput({
+function VariationPicker({
   id,
   label,
   ajuda,
   placeholder,
+  options,
   valores,
   onChange,
+  onRegister,
 }: {
   id: string;
   label: string;
   ajuda?: string;
   placeholder?: string;
+  options: string[];
   valores: string[];
   onChange: (v: string[]) => void;
+  onRegister: (valor: string) => void;
 }) {
-  const [texto, setTexto] = useState("");
-  function adicionar() {
-    const partes = texto
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!partes.length) return;
-    const novos = [...valores];
-    for (const p of partes) {
-      if (!novos.some((x) => x.toLowerCase() === p.toLowerCase())) novos.push(p);
-    }
-    onChange(novos);
-    setTexto("");
+  const [novo, setNovo] = useState("");
+  const marcado = (v: string) => valores.some((x) => x.toLowerCase() === v.toLowerCase());
+
+  function alternar(v: string) {
+    onChange(marcado(v) ? valores.filter((x) => x.toLowerCase() !== v.toLowerCase()) : [...valores, v]);
   }
+
+  function adicionar() {
+    const partes = novo.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!partes.length) return;
+    const sel = [...valores];
+    for (const p of partes) {
+      if (!options.some((o) => o.toLowerCase() === p.toLowerCase())) onRegister(p);
+      if (!sel.some((x) => x.toLowerCase() === p.toLowerCase())) sel.push(p);
+    }
+    onChange(sel);
+    setNovo("");
+  }
+
+  // cadastradas + quaisquer avulsas ja selecionadas que nao estejam na lista
+  const todas = [...options];
+  for (const v of valores) if (!todas.some((o) => o.toLowerCase() === v.toLowerCase())) todas.push(v);
+
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
-      <div className="flex gap-2">
+      {todas.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {todas.map((v) => {
+            const on = marcado(v);
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => alternar(v)}
+                aria-pressed={on}
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  on ? "text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-[#A16207]/40"
+                }`}
+                style={on ? { background: "#A16207" } : undefined}
+              >
+                {v}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="mt-2 flex gap-2">
         <Input
           id={id}
-          value={texto}
+          value={novo}
           placeholder={placeholder}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => setNovo(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") {
               e.preventDefault();
@@ -112,26 +148,6 @@ function ChipsInput({
         </Button>
       </div>
       {ajuda && <p className="mt-1 text-xs text-gray-500">{ajuda}</p>}
-      {valores.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {valores.map((v) => (
-            <span
-              key={v}
-              className="inline-flex items-center gap-1 rounded-full bg-[#A16207]/10 px-2.5 py-1 text-xs text-[#854D0E] ring-1 ring-[#A16207]/20"
-            >
-              {v}
-              <button
-                type="button"
-                aria-label={`Remover ${v}`}
-                onClick={() => onChange(valores.filter((x) => x !== v))}
-                className="text-[#A16207]/60 hover:text-[#854D0E]"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -139,11 +155,11 @@ function ChipsInput({
 export default function ProdutosPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<"produtos" | "estoque" | "categorias">("produtos");
+  const [activeTab, setActiveTab] = useState<"produtos" | "estoque" | "categorias" | "variacoes">("produtos");
 
   useEffect(() => {
-    if (tabParam === "estoque" || tabParam === "categorias" || tabParam === "produtos") {
-      setActiveTab(tabParam as "produtos" | "estoque" | "categorias");
+    if (tabParam === "estoque" || tabParam === "categorias" || tabParam === "produtos" || tabParam === "variacoes") {
+      setActiveTab(tabParam as "produtos" | "estoque" | "categorias" | "variacoes");
     }
   }, [tabParam]);
 
@@ -172,6 +188,8 @@ export default function ProdutosPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<{ id: number; nome: string }[]>([]);
+  const [varCores, setVarCores] = useState<string[]>([]);
+  const [varTamanhos, setVarTamanhos] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "ativo" | "inativo">("all");
@@ -207,6 +225,19 @@ export default function ProdutosPage() {
 
   const loadProducts = () => apiFetch<Product[]>("/products?active_only=false").then(setProducts).catch(() => setProducts([]));
   const loadCategories = () => apiFetch<{ id: number; nome: string }[]>("/categories/all").then(setCategories).catch(() => setCategories([]));
+  const loadVariationOptions = () =>
+    apiFetch<{ tipo: string; valor: string }[]>("/variation-options")
+      .then((list) => {
+        setVarCores(list.filter((o) => o.tipo === "cor").map((o) => o.valor));
+        setVarTamanhos(list.filter((o) => o.tipo === "tamanho").map((o) => o.valor));
+      })
+      .catch(() => {});
+  function registrarVariacao(tipo: "cor" | "tamanho", valor: string) {
+    // otimista: aparece na hora; o POST persiste no pre-cadastro
+    if (tipo === "cor") setVarCores((c) => (c.some((x) => x.toLowerCase() === valor.toLowerCase()) ? c : [...c, valor]));
+    else setVarTamanhos((t) => (t.some((x) => x.toLowerCase() === valor.toLowerCase()) ? t : [...t, valor]));
+    apiFetch("/variation-options", { method: "POST", body: JSON.stringify({ tipo, valor }) }).catch(() => {});
+  }
 
   const filtered = useMemo(() => {
     let list = products;
@@ -273,6 +304,7 @@ export default function ProdutosPage() {
     if (!mounted || !isAuthenticated()) return;
     loadProducts();
     loadCategories();
+    loadVariationOptions();
   }, [mounted, isAuthenticated]);
 
   function openEdit(p: Product) {
@@ -469,10 +501,21 @@ export default function ProdutosPage() {
         >
           Categorias
         </button>
+        <button
+          onClick={() => setActiveTab("variacoes")}
+          className={`px-4 py-2 border-b-2 font-semibold text-sm transition-all ${
+            activeTab === "variacoes"
+              ? "border-primary-700 text-primary-700 font-bold"
+              : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Cores e Tamanhos
+        </button>
       </div>
 
       {activeTab === "estoque" && <EstoqueTab />}
       {activeTab === "categorias" && <CategoriasTab />}
+      {activeTab === "variacoes" && <VariacoesTab />}
       {activeTab === "produtos" && (
         <>
           <PageHeader
@@ -788,21 +831,25 @@ export default function ProdutosPage() {
                   </div>
                   {/* Variacoes opcionais: cor e tamanho — so informativas, refletem no catalogo */}
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-[#A16207]/20 bg-[#A16207]/5 p-3 sm:grid-cols-2">
-                    <ChipsInput
-                      id="cores"
-                      label="Cores (opcional)"
-                      placeholder="Ex: Preto, Bege"
-                      ajuda="Tecle Enter ou vírgula para adicionar."
-                      valores={form.cores}
-                      onChange={(v) => setForm((f) => ({ ...f, cores: v }))}
-                    />
-                    <ChipsInput
+                    <VariationPicker
                       id="tamanhos"
                       label="Tamanhos (opcional)"
-                      placeholder="Ex: P, M, G"
-                      ajuda="Aparecem no catálogo do produto."
+                      placeholder="Adicionar tamanho"
+                      ajuda="Clique para marcar. Adicionar um novo já o cadastra."
+                      options={varTamanhos}
                       valores={form.tamanhos}
                       onChange={(v) => setForm((f) => ({ ...f, tamanhos: v }))}
+                      onRegister={(valor) => registrarVariacao("tamanho", valor)}
+                    />
+                    <VariationPicker
+                      id="cores"
+                      label="Cores (opcional)"
+                      placeholder="Adicionar cor"
+                      ajuda="Clique para marcar. Adicionar uma nova já a cadastra."
+                      options={varCores}
+                      valores={form.cores}
+                      onChange={(v) => setForm((f) => ({ ...f, cores: v }))}
+                      onRegister={(valor) => registrarVariacao("cor", valor)}
                     />
                   </div>
 

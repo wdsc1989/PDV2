@@ -14,6 +14,7 @@ from app.models.system_setting import SystemSetting
 from app.models.client_contact_history import ClientContactHistory
 from app.models.client import Client
 from app.models.stock_adjustment import StockAdjustment
+from app.models.variation_option import VariationOption
 
 __all__ = [
     "User",
@@ -35,4 +36,5 @@ __all__ = [
     "ClientContactHistory",
     "Client",
     "StockAdjustment",
+    "VariationOption",
 ]

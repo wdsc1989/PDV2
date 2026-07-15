@@ -20,6 +20,7 @@ from app.api.endpoints import (
     looks,
     settings,
     clients,
+    variation_options,
 )
 
 api_router = APIRouter()
@@ -40,4 +41,5 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(ai_config.router, prefix="/ai", tags=["ai"])
 api_router.include_router(clients.router, prefix="/clients", tags=["clients"])
+api_router.include_router(variation_options.router, prefix="/variation-options", tags=["variation-options"])
 
