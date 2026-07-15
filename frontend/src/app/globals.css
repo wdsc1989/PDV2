@@ -23,6 +23,8 @@
 body {
   font-family: var(--font-montserrat), var(--font-nunito), sans-serif;
   @apply bg-[#FAFAF9] text-gray-900;
+  /* sem zoom por duplo-toque (sensacao de app); scroll e pan seguem normais */
+  touch-action: manipulation;
 }
 
 .font-serif {

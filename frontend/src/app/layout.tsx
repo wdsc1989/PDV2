@@ -42,6 +42,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // trava o zoom para sensacao de app. Android e o app INSTALADO no iOS
+  // respeitam; a aba solta do Safari ignora de proposito (acessibilidade).
+  maximumScale: 1,
+  userScalable: false,
   themeColor: "#A16207",
 };
 
