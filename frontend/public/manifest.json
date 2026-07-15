@@ -1,6 +1,6 @@
 {
-  "name": "PDV2 - Loja de Roupas",
-  "short_name": "PDV2",
+  "name": "PDVCloset",
+  "short_name": "PDVCloset",
   "description": "Sistema de Ponto de Venda",
   "start_url": "/",
   "scope": "/",

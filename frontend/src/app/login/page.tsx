@@ -116,7 +116,7 @@ export default function LoginPage() {
             />
           ) : (
             <>
-              <h1 className="font-heading text-2xl font-bold text-primary-700 mb-1">PDV2</h1>
+              <h1 className="font-heading text-2xl font-bold text-primary-700 mb-1">PDVCloset</h1>
               <h2 className="font-heading text-lg font-black text-gray-800 text-center leading-snug">
                 {settings?.store_name || "Vieira Closet Boutique"}
               </h2>

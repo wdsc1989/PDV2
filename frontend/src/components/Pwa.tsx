@@ -156,7 +156,7 @@ export function InstalarApp({ persistente = false }: { persistente?: boolean }) 
         style={{ borderColor: `${GOLD}40`, background: `${GOLD}0d` }}
       >
         <span style={{ color: GOLD }}><IcDownload size={16} /></span>
-        <span className="flex-1 text-[13px] font-semibold text-gray-800">Instalar o PDV como app</span>
+        <span className="flex-1 text-[13px] font-semibold text-gray-800">Instalar o PDVCloset</span>
         <span className="text-gray-400"><IcChevron /></span>
       </button>
     );
@@ -171,7 +171,7 @@ export function InstalarApp({ persistente = false }: { persistente?: boolean }) 
           <IcDownload />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-bold text-gray-900">Instalar o PDV</p>
+          <p className="text-[14px] font-bold text-gray-900">Instalar o PDVCloset</p>
           <p className="text-[12px] leading-snug text-gray-600">
             Vira um ícone no tablet/celular e abre em tela cheia, como um app.
           </p>

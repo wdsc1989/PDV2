@@ -14,9 +14,9 @@ const ROADMAP_ITEMS = [
 export default function SobrePage() {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Sobre o PDV2</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Sobre o PDVCloset</h1>
       <p className="text-sm text-gray-500 mb-6">Versão {APP_VERSION}</p>
-      <p className="text-gray-700 mb-6">PDV2 é o sistema de Ponto de Venda evoluído, com backend em FastAPI e frontend em Next.js.</p>
+      <p className="text-gray-700 mb-6">PDVCloset é o sistema de Ponto de Venda evoluído, com backend em FastAPI e frontend em Next.js.</p>
 
       <Card title="Módulos" className="mb-6">
         <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">

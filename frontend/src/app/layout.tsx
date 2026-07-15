@@ -29,11 +29,11 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "PDV2 - Loja de Roupas",
+  title: "PDVCloset",
   description: "Sistema de Ponto de Venda",
   manifest: "/manifest.json",
   // atalho do iOS abre em tela cheia (sem barra do Safari) + icone
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "PDV2" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "PDVCloset" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
   // o Next moderno so emite `mobile-web-app-capable`; o iOS antigo depende do legado
   other: { "apple-mobile-web-app-capable": "yes" },
