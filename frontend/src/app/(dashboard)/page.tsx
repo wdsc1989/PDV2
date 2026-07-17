@@ -103,21 +103,32 @@ export default function Home() {
 
   useEffect(() => {
     if (!mounted || !isAuthenticated()) return;
-    apiFetch<ReportSummary>("/reports/summary?days=1")
-      .then(setSummary)
-      .catch(() => setSummary(null));
     apiFetch<SalesByDayRow[]>("/reports/sales-by-day?days=7")
       .then(setSalesByDay)
       .catch(() => setSalesByDay([]));
     apiFetch<TopProductRow[]>("/reports/top-products?days=7&limit=5")
       .then(setTopProducts)
       .catch(() => setTopProducts([]));
-    apiFetch<AlertRow[]>("/reports/alerts")
-      .then(setAlerts)
-      .catch(() => setAlerts([]));
-    apiFetch<Lead[]>("/catalog/leads?nao_atendidos_only=true")
-      .then(setLeads)
-      .catch(() => setLeads([]));
+  }, [mounted, isAuthenticated]);
+
+  useEffect(() => {
+    if (!mounted || !isAuthenticated()) return;
+
+    function fetchLiveData() {
+      apiFetch<ReportSummary>("/reports/summary?days=1")
+        .then(setSummary)
+        .catch(() => setSummary(null));
+      apiFetch<AlertRow[]>("/reports/alerts")
+        .then(setAlerts)
+        .catch(() => setAlerts([]));
+      apiFetch<Lead[]>("/catalog/leads?nao_atendidos_only=true")
+        .then(setLeads)
+        .catch(() => setLeads([]));
+    }
+
+    fetchLiveData();
+    const interval = setInterval(fetchLiveData, 30000); // Polling a cada 30 segundos
+    return () => clearInterval(interval);
   }, [mounted, isAuthenticated]);
 
   async function handleStartContact(lead: Lead) {
@@ -158,6 +169,10 @@ export default function Home() {
   const showAlertStock = (summary?.produtos_estoque_critico_count ?? 0) > 0;
   const showAlertContas = (summary?.contas_vencidas_count ?? 0) > 0;
 
+  const stockAlerts = alerts.filter((a) => a.tipo === "estoque_baixo");
+  const photoAlerts = alerts.filter((a) => a.tipo === "sem_foto");
+  const panelAlerts = [...stockAlerts, ...photoAlerts];
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -165,7 +180,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Início</h1>
           <p className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
             <span>Bem-vindo. Use o menu para navegar.</span>
-            {alerts.length > 0 && (
+            {panelAlerts.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -175,7 +190,7 @@ export default function Home() {
                 }}
                 className="text-xs text-primary-700 hover:text-primary-800 font-bold underline transition-colors cursor-pointer"
               >
-                {showStockAlerts ? "Ocultar alertas de estoque" : `Exibir alertas de estoque (${alerts.length})`}
+                {showStockAlerts ? "Ocultar alertas" : `Exibir alertas (${stockAlerts.length} estoque, ${photoAlerts.length} sem foto)`}
               </button>
             )}
           </p>
@@ -196,42 +211,74 @@ export default function Home() {
         </div>
       </div>
 
-      {showStockAlerts && alerts.length > 0 && (
-        <section className="mb-8 animate-fade-in">
-          <div className="relative rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
-            <button
-              type="button"
-              onClick={() => {
-                setShowStockAlerts(false);
-                localStorage.setItem("pdv2_show_stock_alerts", "false");
-                toast.success("Alertas de estoque ocultados. Você pode reativá-los no link do topo.");
-              }}
-              className="absolute top-3 right-3 text-amber-700 hover:text-amber-900 p-1 rounded-full hover:bg-amber-100/50 transition-colors cursor-pointer"
-              title="Ocultar alertas permanentemente"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
-              <span aria-hidden>⚠️</span> Alertas ({alerts.length})
-            </h2>
-            <ul className="space-y-1 text-sm text-amber-900 pr-6">
-              {alerts.slice(0, 8).map((a) => (
-                <li key={`${a.tipo}-${a.product_id}`} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{a.nome}</span>
-                  <span className="shrink-0 text-xs font-medium">
-                    {a.tipo === "estoque_baixo"
-                      ? `Estoque ${a.estoque_atual} (mín. ${a.estoque_minimo ?? "—"})`
-                      : "Sem foto no catálogo"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {alerts.length > 8 && (
-              <p className="mt-2 text-xs text-amber-700">+{alerts.length - 8} outros alertas</p>
-            )}
-          </div>
+      {showStockAlerts && panelAlerts.length > 0 && (
+        <section className="mb-8 animate-fade-in space-y-3">
+          {stockAlerts.length > 0 && (
+            <div className="relative rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStockAlerts(false);
+                  localStorage.setItem("pdv2_show_stock_alerts", "false");
+                  toast.success("Alertas ocultados. Você pode reativá-los no link do topo.");
+                }}
+                className="absolute top-3 right-3 text-amber-700 hover:text-amber-900 p-1 rounded-full hover:bg-amber-100/50 transition-colors cursor-pointer"
+                title="Ocultar alertas permanentemente"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+                <span aria-hidden>⚠️</span> Estoque baixo ({stockAlerts.length})
+              </h2>
+              <ul className="space-y-1 text-sm text-amber-900 pr-6">
+                {stockAlerts.slice(0, 8).map((a) => (
+                  <li key={`estoque_baixo-${a.product_id}`} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{a.nome}</span>
+                    <span className="shrink-0 text-xs font-medium">
+                      Estoque {a.estoque_atual} (mín. {a.estoque_minimo ?? "—"})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {stockAlerts.length > 8 && (
+                <p className="mt-2 text-xs text-amber-700">+{stockAlerts.length - 8} outros produtos com estoque baixo</p>
+              )}
+            </div>
+          )}
+
+          {photoAlerts.length > 0 && (
+            <div className="relative rounded-lg border-2 border-sky-200 bg-sky-50 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStockAlerts(false);
+                  localStorage.setItem("pdv2_show_stock_alerts", "false");
+                  toast.success("Alertas ocultados. Você pode reativá-los no link do topo.");
+                }}
+                className="absolute top-3 right-3 text-sky-700 hover:text-sky-900 p-1 rounded-full hover:bg-sky-100/50 transition-colors cursor-pointer"
+                title="Ocultar alertas permanentemente"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-sky-800">
+                <span aria-hidden>🖼️</span> Sem foto no catálogo ({photoAlerts.length})
+              </h2>
+              <ul className="space-y-1 text-sm text-sky-900 pr-6">
+                {photoAlerts.slice(0, 8).map((a) => (
+                  <li key={`sem_foto-${a.product_id}`} className="truncate">
+                    {a.nome}
+                  </li>
+                ))}
+              </ul>
+              {photoAlerts.length > 8 && (
+                <p className="mt-2 text-xs text-sky-700">+{photoAlerts.length - 8} outros produtos sem foto</p>
+              )}
+            </div>
+          )}
         </section>
       )}
 
