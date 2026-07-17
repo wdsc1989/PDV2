@@ -7,7 +7,7 @@ import { apiFetch, assetUrl } from "@/api/client";
 import { EstoqueTab } from "@/components/produtos/EstoqueTab";
 import { CategoriasTab } from "@/components/produtos/CategoriasTab";
 import { VariacoesTab } from "@/components/produtos/VariacoesTab";
-import { Button, Card, Table, Input, Label, Select, toast, KpiCard, FilterBar, Badge, ConfirmModal, PageHeader } from "@/components/ui";
+import { Button, Card, Table, Input, Label, Select, toast, KpiCard, FilterBar, Badge, ConfirmModal, PageHeader, ActionsMenu } from "@/components/ui";
 import { BarcodeLabelModal, type BarcodeLabelProduct } from "@/components/produtos/BarcodeLabelModal";
 import { compressImage } from "@/lib/image";
 
@@ -963,13 +963,15 @@ export default function ProdutosPage() {
               key: "actions",
               label: "Ações",
               render: (r) => (
-                <div className="flex flex-wrap gap-1">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(r)}>Editar</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setStockProduct(r)}>Entrada</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => { setAdjProduct(r); setAdjNewQty(String(r.estoque_atual)); setAdjError(""); }}>Ajuste</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setLabelProduct(r)}>Etiqueta</Button>
-                  <Button type="button" size="sm" variant="danger" onClick={() => setDeleteConfirm(r.id)}>Excluir</Button>
-                </div>
+                <ActionsMenu
+                  items={[
+                    { label: "Editar", onClick: () => openEdit(r) },
+                    { label: "Entrada de estoque", onClick: () => setStockProduct(r) },
+                    { label: "Ajustar estoque", onClick: () => { setAdjProduct(r); setAdjNewQty(String(r.estoque_atual)); setAdjError(""); } },
+                    { label: "Gerar etiqueta", onClick: () => setLabelProduct(r) },
+                    { label: "Excluir", onClick: () => setDeleteConfirm(r.id), variant: "danger" },
+                  ]}
+                />
               ),
             },
           ]}
@@ -997,12 +999,16 @@ export default function ProdutosPage() {
                   <p className="text-blue-600 font-semibold">R$ {p.preco_venda.toFixed(2)}</p>
                   <p className="text-sm text-gray-600">Estoque: {p.estoque_atual} {lowStock && <Badge variant="danger" className="ml-1">Baixo</Badge>}</p>
                 </div>
-                <div className="flex flex-col gap-1 shrink-0">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(p)}>Editar</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setStockProduct(p)}>Entrada</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => { setAdjProduct(p); setAdjNewQty(String(p.estoque_atual)); setAdjError(""); }}>Ajuste</Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setLabelProduct(p)}>Etiqueta</Button>
-                  <Button type="button" size="sm" variant="danger" onClick={() => setDeleteConfirm(p.id)}>Excluir</Button>
+                <div className="shrink-0">
+                  <ActionsMenu
+                    items={[
+                      { label: "Editar", onClick: () => openEdit(p) },
+                      { label: "Entrada de estoque", onClick: () => setStockProduct(p) },
+                      { label: "Ajustar estoque", onClick: () => { setAdjProduct(p); setAdjNewQty(String(p.estoque_atual)); setAdjError(""); } },
+                      { label: "Gerar etiqueta", onClick: () => setLabelProduct(p) },
+                      { label: "Excluir", onClick: () => setDeleteConfirm(p.id), variant: "danger" },
+                    ]}
+                  />
                 </div>
               </div>
             </Card>

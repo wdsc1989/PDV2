@@ -24,5 +24,7 @@ export { Skeleton, SkeletonRows, SkeletonCards } from "./Skeleton";
 export { Spinner } from "./Spinner";
 export { PageHeader } from "./PageHeader";
 export { IconButton } from "./IconButton";
+export { ActionsMenu } from "./ActionsMenu";
+export type { ActionsMenuItem } from "./ActionsMenu";
 export { InfoHint } from "./InfoHint";
 export { ErrorState } from "./ErrorState";
