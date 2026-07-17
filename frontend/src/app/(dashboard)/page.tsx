@@ -234,11 +234,16 @@ export default function Home() {
               </h2>
               <ul className="space-y-1 text-sm text-amber-900 pr-6">
                 {stockAlerts.slice(0, 8).map((a) => (
-                  <li key={`estoque_baixo-${a.product_id}`} className="flex items-center justify-between gap-2">
-                    <span className="truncate">{a.nome}</span>
-                    <span className="shrink-0 text-xs font-medium">
-                      Estoque {a.estoque_atual} (mín. {a.estoque_minimo ?? "—"})
-                    </span>
+                  <li key={`estoque_baixo-${a.product_id}`}>
+                    <Link
+                      href={`/produtos?edit=${a.product_id}`}
+                      className="flex items-center justify-between gap-2 hover:underline rounded px-1 -mx-1 hover:bg-amber-100/60 transition-colors"
+                    >
+                      <span className="truncate">{a.nome}</span>
+                      <span className="shrink-0 text-xs font-medium">
+                        Estoque {a.estoque_atual} (mín. {a.estoque_minimo ?? "—"})
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -269,8 +274,13 @@ export default function Home() {
               </h2>
               <ul className="space-y-1 text-sm text-sky-900 pr-6">
                 {photoAlerts.slice(0, 8).map((a) => (
-                  <li key={`sem_foto-${a.product_id}`} className="truncate">
-                    {a.nome}
+                  <li key={`sem_foto-${a.product_id}`}>
+                    <Link
+                      href={`/produtos?edit=${a.product_id}`}
+                      className="block truncate hover:underline rounded px-1 -mx-1 hover:bg-sky-100/60 transition-colors"
+                    >
+                      {a.nome}
+                    </Link>
                   </li>
                 ))}
               </ul>

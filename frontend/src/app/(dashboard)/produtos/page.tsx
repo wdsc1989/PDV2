@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { apiFetch, assetUrl } from "@/api/client";
 import { EstoqueTab } from "@/components/produtos/EstoqueTab";
@@ -153,8 +153,10 @@ function VariationPicker({
 }
 
 export default function ProdutosPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const editParam = searchParams.get("edit");
   const [activeTab, setActiveTab] = useState<"produtos" | "estoque" | "categorias" | "variacoes">("produtos");
 
   useEffect(() => {
@@ -306,6 +308,17 @@ export default function ProdutosPage() {
     loadCategories();
     loadVariationOptions();
   }, [mounted, isAuthenticated]);
+
+  useEffect(() => {
+    if (!editParam || products.length === 0) return;
+    const id = parseInt(editParam, 10);
+    const product = products.find((p) => p.id === id);
+    if (product) {
+      openEdit(product);
+      router.replace(tabParam ? `/produtos?tab=${tabParam}` : "/produtos");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, products]);
 
   function openEdit(p: Product) {
     setEditingId(p.id);
